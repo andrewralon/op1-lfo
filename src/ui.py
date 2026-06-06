@@ -117,10 +117,11 @@ class WaveformPreview(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._wave   = LfoWave.SINE
-        self._depth  = 20
-        self._center = 64
-        self._phase  = 0.0
+        self._wave       = LfoWave.SINE
+        self._depth      = 20
+        self._center     = 64
+        self._phase      = 0.0
+        self._rate_ticks = PPQN   # default: 1 cycle per beat
         self.setFixedHeight(90)
         self.setStyleSheet(
             f"background-color: {_BG};"
@@ -128,10 +129,11 @@ class WaveformPreview(QWidget):
             "border-radius: 4px;"
         )
 
-    def set_params(self, wave: LfoWave, depth: int, center: int) -> None:
-        self._wave   = wave
-        self._depth  = depth
-        self._center = center
+    def set_params(self, wave: LfoWave, depth: int, center: int, rate_ticks: int = PPQN) -> None:
+        self._wave       = wave
+        self._depth      = depth
+        self._center     = center
+        self._rate_ticks = rate_ticks
         self.update()
 
     def set_phase(self, phase: float) -> None:
@@ -153,8 +155,8 @@ class WaveformPreview(QWidget):
         p.setPen(QPen(QColor("#333333"), 1, Qt.PenStyle.DashLine))
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
-        # Waveform — 2 cycles
-        n_cycles = 2
+        # Cycles visible = how many full cycles fit in one beat at this rate
+        n_cycles = PPQN / self._rate_ticks   # float; e.g. 0.25 for rate 1, 8.0 for rate 8
         steps    = w * 2
         pen = QPen(QColor(_ACCENT), 2)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -440,10 +442,11 @@ class LfoPanel(QFrame):
         self._rate_spin.valueChanged.connect(
             lambda v: self._rate_desc_lbl.setText(_RATE_DESC[v])
         )
+        self._rate_spin.valueChanged.connect(lambda _: self._update_preview())
 
         self._depth_spin = QSpinBox()
         self._depth_spin.setRange(0, 49)
-        self._depth_spin.setValue(16)   # ≈ MIDI 20
+        self._depth_spin.setValue(25)
         self._depth_spin.setFixedWidth(52)
         self._depth_spin.setStyleSheet(_spin_style)
 
@@ -553,10 +556,11 @@ class LfoPanel(QFrame):
         return lbl
 
     def _update_preview(self, *_) -> None:
-        wave         = LFO_WAVE_LABELS[self._wave_combo.currentText()]
-        depth_midi   = _ui_to_midi(self._depth_spin.value())
-        center_midi  = _ui_to_midi(self._center_spin.value())
-        self._preview.set_params(wave, depth_midi, center_midi)
+        wave        = LFO_WAVE_LABELS[self._wave_combo.currentText()]
+        depth_midi  = _ui_to_midi(self._depth_spin.value())
+        center_midi = _ui_to_midi(self._center_spin.value())
+        rate_ticks  = _RATE_TICKS[self._rate_spin.value()]
+        self._preview.set_params(wave, depth_midi, center_midi, rate_ticks)
         lo = _midi_to_ui(max(0,   center_midi - depth_midi))
         hi = _midi_to_ui(min(127, center_midi + depth_midi))
         self._range_label.setText(f"Range: {lo} – {hi}")
