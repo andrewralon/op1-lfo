@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QSpinBox, QCheckBox, QListWidget,
     QListWidgetItem,
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QPointF
+from PyQt6.QtGui import QFont, QColor, QPainter
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
 from src.automation import AutomationEngine, Clip, Parameter, CURVE_LABELS, PARAMETER_LABELS
@@ -69,6 +69,24 @@ class ClockBridge(QObject):
 
 
 # ---------------------------------------------------------------------------
+# Pan dial with center reference marker
+# ---------------------------------------------------------------------------
+
+class PanDial(QDial):
+    """QDial with a fixed dot at 12 o'clock: gray when off-center, accent when centered."""
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cx = self.width() / 2.0
+        painter.setPen(Qt.PenStyle.NoPen)
+        color = QColor(_ACCENT) if self.value() == 64 else QColor(_DIM)
+        painter.setBrush(color)
+        painter.drawEllipse(QPointF(cx, 4.5), 3.0, 3.0)
+        painter.end()
+
+
+# ---------------------------------------------------------------------------
 # Per-track strip — OP-1 Field style
 # ---------------------------------------------------------------------------
 
@@ -110,7 +128,7 @@ class TrackStrip(QFrame):
         hl.setContentsMargins(10, 0, 10, 0)
         t_lbl = QLabel(f"TRACK  {self._track}")
         hf = QFont()
-        hf.setPointSize(8)
+        hf.setPointSize(9)
         hf.setBold(True)
         hf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
         t_lbl.setFont(hf)
@@ -135,12 +153,12 @@ class TrackStrip(QFrame):
         # Pan knob
         pan_lbl = QLabel("PAN")
         pan_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pan_lbl.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
+        pan_lbl.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         body.addWidget(pan_lbl)
 
         # Range 0–128 (not 0–127): midpoint = 64 lands exactly at 12 o'clock,
         # so the center notch tick is symmetric.  CC is clamped to 127 on send.
-        self._pan_dial = QDial()
+        self._pan_dial = PanDial()
         self._pan_dial.setRange(0, 128)
         self._pan_dial.setValue(64)
         self._pan_dial.setNotchesVisible(False)
@@ -149,7 +167,7 @@ class TrackStrip(QFrame):
         self._pan_dial.valueChanged.connect(self._on_pan_changed)
 
         # Equal fixed-width L/R labels so the knob stays visually centred
-        _side_style = f"color: {_DIM}; font-size: 8pt; font-weight: bold;"
+        _side_style = f"color: {_DIM}; font-size: 10pt; font-weight: bold;"
         l_lbl = QLabel("L")
         l_lbl.setFixedWidth(18)
         l_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -168,15 +186,10 @@ class TrackStrip(QFrame):
         pan_row.addWidget(r_lbl)
         body.addLayout(pan_row)
 
-        self._pan_val = QLabel("C")
-        self._pan_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._pan_val.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
-        body.addWidget(self._pan_val)
-
         # Volume fader
         vol_lbl = QLabel("VOLUME")
         vol_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        vol_lbl.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
+        vol_lbl.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         body.addWidget(vol_lbl)
 
         # Qt vertical slider: min at bottom, max at top — correct fader orientation
@@ -192,7 +205,7 @@ class TrackStrip(QFrame):
 
         self._vol_val = QLabel(str(_midi_to_ui(100)))
         self._vol_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._vol_val.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
+        self._vol_val.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         body.addWidget(self._vol_val)
 
         outer.addLayout(body)
@@ -216,14 +229,13 @@ class TrackStrip(QFrame):
             f"QPushButton {{"
             f"  background-color: {bg}; color: {fg};"
             f"  border: none; border-radius: 4px;"
-            f"  font-weight: bold; font-size: 8pt; letter-spacing: 1px;"
+            f"  font-weight: bold; font-size: 10pt; letter-spacing: 1px;"
             f"}}"
             f"QPushButton:hover {{ background-color: {color}; color: #000; }}"
         )
 
     def _on_pan_changed(self, value: int) -> None:
         cc = min(value, 127)   # dial range is 0–128; clamp top end for MIDI
-        self._pan_val.setText(_pan_label(cc))
         if self._ready:
             self._ctrl.set_pan(self._track, cc)
 
@@ -247,7 +259,6 @@ class TrackStrip(QFrame):
             self._pan_dial.blockSignals(True)
             self._pan_dial.setValue(value)
             self._pan_dial.blockSignals(False)
-            self._pan_val.setText(_pan_label(value))
 
     def update_from_cc(self, control: int, value: int) -> None:
         """Sync UI from a CC message received from the OP-1 — no CC sent back."""
@@ -260,7 +271,6 @@ class TrackStrip(QFrame):
             self._pan_dial.blockSignals(True)
             self._pan_dial.setValue(value)
             self._pan_dial.blockSignals(False)
-            self._pan_val.setText(_pan_label(value))
         elif control == CC_MUTE:
             muted = value >= 64
             self._ctrl.sync_mute_state(self._track, muted)
@@ -268,11 +278,6 @@ class TrackStrip(QFrame):
             self._mute_btn.setChecked(muted)
             self._mute_btn.blockSignals(False)
             self._set_mute_style(muted)
-
-
-def _pan_label(value: int) -> str:
-    offset = value - 64
-    return "C" if offset == 0 else f"{'L' if offset < 0 else 'R'}{abs(offset)}"
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +304,7 @@ class AutomationPanel(QFrame):
 
         title = QLabel("AUTOMATION")
         tf = QFont()
-        tf.setPointSize(8)
+        tf.setPointSize(10)
         tf.setBold(True)
         tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
         title.setFont(tf)
@@ -329,7 +334,7 @@ class AutomationPanel(QFrame):
         self._to_spin   = self._make_spin(0, 99, 0,  52)
         self._dur_spin  = self._make_spin(1, 128, 8,   52)
         self._loop_chk  = QCheckBox("Loop")
-        self._loop_chk.setStyleSheet(f"color: {_TEXT}; font-size: 9pt;")
+        self._loop_chk.setStyleSheet(f"color: {_TEXT}; font-size: 11pt;")
         for lbl, w in [("From", self._from_spin), ("To", self._to_spin), ("Dur", self._dur_spin)]:
             row2.addWidget(self._dim_label(lbl))
             row2.addWidget(w)
@@ -343,14 +348,14 @@ class AutomationPanel(QFrame):
         add_btn = QPushButton("▶  Add")
         add_btn.setFixedHeight(28)
         add_btn.setStyleSheet(
-            f"QPushButton {{ background-color: #1e4a1e; color: {_TEXT}; border: none; border-radius: 4px; font-size: 9pt; }}"
+            f"QPushButton {{ background-color: #1e4a1e; color: {_TEXT}; border: none; border-radius: 4px; font-size: 11pt; }}"
             f"QPushButton:hover {{ background-color: #2a6a2a; }}"
         )
         add_btn.clicked.connect(self._on_add)
         clr_btn = QPushButton("✕  Clear All")
         clr_btn.setFixedHeight(28)
         clr_btn.setStyleSheet(
-            f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT}; border: none; border-radius: 4px; font-size: 9pt; }}"
+            f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT}; border: none; border-radius: 4px; font-size: 11pt; }}"
             f"QPushButton:hover {{ background-color: #3a3a3a; }}"
         )
         clr_btn.clicked.connect(self._on_clear)
@@ -366,7 +371,7 @@ class AutomationPanel(QFrame):
         right.addWidget(self._dim_label("Active clips"))
         self._clip_list = QListWidget()
         self._clip_list.setStyleSheet(
-            f"QListWidget {{ background-color: {_BG}; color: {_TEXT}; border: 1px solid #2e2e2e; border-radius: 4px; font-size: 8pt; }}"
+            f"QListWidget {{ background-color: {_BG}; color: {_TEXT}; border: 1px solid #2e2e2e; border-radius: 4px; font-size: 10pt; }}"
         )
         self._clip_list.setMinimumWidth(200)
         self._clip_list.setMaximumHeight(90)
@@ -378,7 +383,11 @@ class AutomationPanel(QFrame):
     def _make_combo(self, items: list[str], attr: str) -> QComboBox:
         box = QComboBox()
         box.addItems(items)
-        box.setStyleSheet(f"font-size: 9pt; color: {_TEXT}; background-color: {_BG};")
+        box.setStyleSheet(
+            f"QComboBox {{ font-size: 11pt; color: {_TEXT}; background-color: {_BG}; }}"
+            f"QComboBox QAbstractItemView {{ color: {_TEXT}; background-color: {_BG};"
+            f"  selection-background-color: {_ACCENT}; selection-color: #000; }}"
+        )
         setattr(self, attr, box)
         return box
 
@@ -387,11 +396,12 @@ class AutomationPanel(QFrame):
         s.setRange(lo, hi)
         s.setValue(default)
         s.setFixedWidth(width)
+        s.setStyleSheet(f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;")
         return s
 
     def _dim_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
+        lbl.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         return lbl
 
     def _on_add(self) -> None:
@@ -475,13 +485,6 @@ class MainWindow(QMainWindow):
 
         # Header
         header = QHBoxLayout()
-        title_lbl = QLabel("OP-1 Field MIDI Controller")
-        tf = QFont()
-        tf.setPointSize(15)
-        tf.setBold(True)
-        title_lbl.setFont(tf)
-        title_lbl.setStyleSheet(f"color: {_TEXT};")
-        header.addWidget(title_lbl)
         header.addStretch()
         self._bpm_label = QLabel("BPM: --")
         bf = QFont("Menlo", 20)
@@ -492,7 +495,7 @@ class MainWindow(QMainWindow):
         root.addLayout(header)
 
         status = QLabel(f"● Connected: {port_name}")
-        status.setStyleSheet(f"color: {_GREEN}; font-size: 9pt; font-weight: bold;")
+        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
         root.addWidget(status)
 
         sep = QFrame()
