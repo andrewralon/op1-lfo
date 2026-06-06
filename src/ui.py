@@ -204,7 +204,7 @@ class TrackStrip(QFrame):
             "   border: 1px solid #2e2e2e;"
             "}"
         )
-        self.setFixedWidth(90)
+        self.setFixedWidth(100)
 
         outer = QVBoxLayout(self)
         outer.setSpacing(0)
@@ -228,13 +228,13 @@ class TrackStrip(QFrame):
         body.setContentsMargins(6, 8, 6, 8)
 
         # Pan knob with L / R flanking labels
-        _side = f"color: {_DIM}; font-size: 8pt; font-weight: bold;"
+        _side = f"color: {_DIM}; font-size: 10pt; font-weight: bold;"
         l_lbl = QLabel("L")
-        l_lbl.setFixedWidth(10)
+        l_lbl.setFixedWidth(18)
         l_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         l_lbl.setStyleSheet(_side)
         r_lbl = QLabel("R")
-        r_lbl.setFixedWidth(10)
+        r_lbl.setFixedWidth(18)
         r_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         r_lbl.setStyleSheet(_side)
 
@@ -243,7 +243,7 @@ class TrackStrip(QFrame):
         self._pan_dial.setValue(64)
         self._pan_dial.setNotchesVisible(False)
         self._pan_dial.setWrapping(False)
-        self._pan_dial.setFixedSize(52, 52)
+        self._pan_dial.setFixedSize(44, 44)
         self._pan_dial.valueChanged.connect(self._on_pan_changed)
 
         pan_row = QHBoxLayout()
@@ -271,7 +271,7 @@ class TrackStrip(QFrame):
             "QSlider::groove:vertical {"
             "  width: 4px; background-color: #333333; border-radius: 2px;"
             "}"
-            "QSlider::sub-page:vertical {"
+            "QSlider::add-page:vertical {"
             f"  background-color: {_ACCENT}; border-radius: 2px; width: 4px;"
             "}"
             "QSlider::handle:vertical {"
@@ -667,7 +667,7 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, port_name: str) -> None:
         self.setWindowTitle("OP-1 Field MIDI Controller")
-        self.setMinimumSize(700, 680)
+        self.setMinimumSize(700, 600)
         self.setStyleSheet(f"QMainWindow {{ background-color: {_BG}; }}")
 
         central = QWidget()
@@ -676,42 +676,41 @@ class MainWindow(QMainWindow):
         root.setSpacing(12)
         root.setContentsMargins(18, 14, 18, 14)
 
-        # ── Compact header: status left, BPM right ──
-        header = QHBoxLayout()
-
-        status = QLabel(f"● Connected: {port_name}")
-        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
-        header.addWidget(status)
-
-        header.addStretch()
-
-        self._bpm_label = QLabel("BPM: --")
-        bf = QFont("Menlo", 20)
-        bf.setBold(True)
-        self._bpm_label.setFont(bf)
-        self._bpm_label.setStyleSheet(f"color: {_ACCENT};")
-        header.addWidget(self._bpm_label)
-        root.addLayout(header)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("border: none; background-color: #2a2a2a; max-height: 1px;")
-        root.addWidget(sep)
-
-        # ── Track strips ──
+        # ── Track strips + status/BPM info column to the right ──
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(10)
         for t in (1, 2, 3, 4):
             strip = TrackStrip(t, controller)
             self._strips[t] = strip
             tracks_row.addWidget(strip)
+
+        info_col = QVBoxLayout()
+        info_col.setSpacing(6)
+        info_col.setContentsMargins(16, 0, 0, 0)
+        info_col.addStretch()
+
+        status = QLabel(f"● Connected: {port_name}")
+        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
+        info_col.addWidget(status)
+
+        info_col.addSpacing(10)
+
+        self._bpm_label = QLabel("BPM: --")
+        bf = QFont("Menlo", 20)
+        bf.setBold(True)
+        self._bpm_label.setFont(bf)
+        self._bpm_label.setStyleSheet(f"color: {_ACCENT};")
+        info_col.addWidget(self._bpm_label)
+
+        info_col.addStretch()
+        tracks_row.addLayout(info_col)
         tracks_row.addStretch()
         root.addLayout(tracks_row)
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("border: none; background-color: #2a2a2a; max-height: 1px;")
-        root.addWidget(sep2)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("border: none; background-color: #2a2a2a; max-height: 1px;")
+        root.addWidget(sep)
 
         # ── LFO panel ──
         self._lfo_panel = LfoPanel(engine, self._clock, self._get_strip_value)
