@@ -34,6 +34,13 @@ TRACK_COLORS = {
 }
 
 
+def _midi_to_ui(v: int) -> int:
+    return round(v * 99 / 127)
+
+def _ui_to_midi(v: int) -> int:
+    return round(v * 127 / 99)
+
+
 def apply_dark_theme(app: QApplication) -> None:
     app.setStyle("Fusion")
     p = app.palette()
@@ -136,7 +143,7 @@ class TrackStrip(QFrame):
         self._pan_dial = QDial()
         self._pan_dial.setRange(0, 128)
         self._pan_dial.setValue(64)
-        self._pan_dial.setNotchesVisible(True)
+        self._pan_dial.setNotchesVisible(False)
         self._pan_dial.setWrapping(False)
         self._pan_dial.setFixedSize(64, 64)
         self._pan_dial.valueChanged.connect(self._on_pan_changed)
@@ -183,7 +190,7 @@ class TrackStrip(QFrame):
         self._vol_slider.valueChanged.connect(self._on_volume_changed)
         body.addWidget(self._vol_slider, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        self._vol_val = QLabel("100")
+        self._vol_val = QLabel(str(_midi_to_ui(100)))
         self._vol_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._vol_val.setStyleSheet(f"color: {_DIM}; font-size: 8pt; font-weight: bold;")
         body.addWidget(self._vol_val)
@@ -221,7 +228,7 @@ class TrackStrip(QFrame):
             self._ctrl.set_pan(self._track, cc)
 
     def _on_volume_changed(self, value: int) -> None:
-        self._vol_val.setText(str(value))
+        self._vol_val.setText(str(_midi_to_ui(value)))
         if self._ready:
             self._ctrl.set_volume(self._track, value)
 
@@ -235,7 +242,7 @@ class TrackStrip(QFrame):
             self._vol_slider.blockSignals(True)
             self._vol_slider.setValue(value)
             self._vol_slider.blockSignals(False)
-            self._vol_val.setText(str(value))
+            self._vol_val.setText(str(_midi_to_ui(value)))
         elif param_name == Parameter.PAN.value:
             self._pan_dial.blockSignals(True)
             self._pan_dial.setValue(value)
@@ -248,7 +255,7 @@ class TrackStrip(QFrame):
             self._vol_slider.blockSignals(True)
             self._vol_slider.setValue(value)
             self._vol_slider.blockSignals(False)
-            self._vol_val.setText(str(value))
+            self._vol_val.setText(str(_midi_to_ui(value)))
         elif control == CC_PAN:
             self._pan_dial.blockSignals(True)
             self._pan_dial.setValue(value)
@@ -318,8 +325,8 @@ class AutomationPanel(QFrame):
 
         row2 = QHBoxLayout()
         row2.setSpacing(8)
-        self._from_spin = self._make_spin(0, 127, 100, 52)
-        self._to_spin   = self._make_spin(0, 127, 0,   52)
+        self._from_spin = self._make_spin(0, 99, 99, 52)
+        self._to_spin   = self._make_spin(0, 99, 0,  52)
         self._dur_spin  = self._make_spin(1, 128, 8,   52)
         self._loop_chk  = QCheckBox("Loop")
         self._loop_chk.setStyleSheet(f"color: {_TEXT}; font-size: 9pt;")
@@ -391,8 +398,8 @@ class AutomationPanel(QFrame):
         track    = int(self._track_box.currentText())
         param    = PARAMETER_LABELS[self._param_box.currentText()]
         curve    = CURVE_LABELS[self._curve_box.currentText()]
-        from_val = self._from_spin.value()
-        to_val   = self._to_spin.value()
+        from_val = _ui_to_midi(self._from_spin.value())
+        to_val   = _ui_to_midi(self._to_spin.value())
         dur      = self._dur_spin.value()
         loop     = self._loop_chk.isChecked()
         start    = max(1, self._clock.beat_count + 1)
@@ -423,7 +430,7 @@ class AutomationPanel(QFrame):
             loop_tag = " ↻" if clip.loop else ""
             self._clip_list.addItem(QListWidgetItem(
                 f"T{clip.track} {clip.parameter.value.upper()[:3]}  "
-                f"{clip.start_value}→{clip.end_value}  "
+                f"{_midi_to_ui(clip.start_value)}→{_midi_to_ui(clip.end_value)}  "
                 f"{clip.duration_beats}b  {curve_name}{loop_tag}"
             ))
 
