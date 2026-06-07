@@ -136,10 +136,13 @@ class LfoClip:
     rate_ticks: int     # ticks per full cycle (PPQN-based)
     depth: int          # oscillation half-amplitude in MIDI units
     center_value: int   # MIDI center (0–127)
+    inverted: bool = False
 
     def value_at(self, phase: float) -> int:
         """phase: 0.0–1.0 position within one cycle."""
         y = lfo_wave_value(phase, self.wave)
+        if self.inverted:
+            y = -y
         return max(0, min(127, round(self.center_value + y * self.depth)))
 
 

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QSlider, QDial, QFrame, QSizePolicy,
     QApplication, QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
-    QListWidget, QListWidgetItem,
+    QListWidget, QListWidgetItem, QCheckBox,
 )
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QPointF, QSize, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QIcon
@@ -420,7 +420,7 @@ class LfoPanel(QFrame):
         root.setSpacing(8)
         root.setContentsMargins(14, 10, 14, 10)
 
-        # ── Row 1: title + Track / Param / Wave combos on one line ──
+        # ── Row 1: title + Track buttons / Param / Wave ──
         hdr = QHBoxLayout()
         hdr.setSpacing(8)
 
@@ -435,20 +435,41 @@ class LfoPanel(QFrame):
 
         hdr.addSpacing(8)
 
-        self._track_combo = self._make_combo([str(t) for t in (1, 2, 3, 4)])
+        # Track toggle buttons — create before wiring signals to avoid premature callbacks
+        hdr.addWidget(self._dim_label("Tracks"))
+        self._track_btns: dict[int, QPushButton] = {}
+        for t in (1, 2, 3, 4):
+            btn = QPushButton(str(t))
+            btn.setCheckable(True)
+            btn.setChecked(t == 1)
+            btn.setFixedSize(28, 28)
+            self._track_btns[t] = btn
+            hdr.addWidget(btn)
+
+        hdr.addSpacing(8)
         self._param_combo = self._make_combo(list(PARAMETER_LABELS))
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
 
         for lbl_text, widget in [
-            ("Track", self._track_combo),
             ("Param", self._param_combo),
             ("Wave",  self._wave_combo),
         ]:
             hdr.addWidget(self._dim_label(lbl_text))
             hdr.addWidget(widget)
 
+        hdr.addSpacing(12)
+        self._invert_check = QCheckBox("Invert 2nd+")
+        self._invert_check.setStyleSheet(f"QCheckBox {{ color: {_TEXT}; font-size: 10pt; }}")
+        self._invert_check.setEnabled(False)
+        hdr.addWidget(self._invert_check)
+
         hdr.addStretch()
         root.addLayout(hdr)
+
+        # Wire track buttons and set initial styles now that invert_check exists
+        for btn in self._track_btns.values():
+            btn.toggled.connect(lambda _: self._update_track_btn_styles())
+        self._update_track_btn_styles()
 
         # ── Row 2: waveform preview ──
         self._preview = WaveformPreview()
@@ -584,6 +605,25 @@ class LfoPanel(QFrame):
         lbl.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         return lbl
 
+    def _update_track_btn_styles(self) -> None:
+        selected_count = sum(1 for btn in self._track_btns.values() if btn.isChecked())
+        for t, btn in self._track_btns.items():
+            color = TRACK_COLORS[t]
+            if btn.isChecked():
+                style = (
+                    f"QPushButton {{ background-color: {color}; color: #000000;"
+                    f"  border: none; border-radius: 4px; font-size: 11pt; font-weight: bold; }}"
+                    f"QPushButton:hover {{ background-color: {color}; }}"
+                )
+            else:
+                style = (
+                    f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_DIM};"
+                    f"  border: none; border-radius: 4px; font-size: 11pt; font-weight: bold; }}"
+                    f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+                )
+            btn.setStyleSheet(style)
+        self._invert_check.setEnabled(selected_count >= 2)
+
     def _update_preview(self, *_) -> None:
         wave        = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         depth_midi  = _ui_to_midi(self._depth_spin.value())
@@ -595,22 +635,35 @@ class LfoPanel(QFrame):
         self._range_label.setText(f"Range: {lo} – {hi}")
 
     def _on_use_current(self) -> None:
-        track     = int(self._track_combo.currentText())
-        param     = PARAMETER_LABELS[self._param_combo.currentText()]
-        midi_val  = self._get_value(track, param)
+        selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
+        if not selected:
+            return
+        param    = PARAMETER_LABELS[self._param_combo.currentText()]
+        midi_val = self._get_value(selected[0], param)
         self._center_spin.setValue(_midi_to_ui(midi_val))
 
     def _on_start(self) -> None:
-        lfo = LfoClip(
-            track        = int(self._track_combo.currentText()),
-            parameter    = PARAMETER_LABELS[self._param_combo.currentText()],
-            wave         = LFO_WAVE_LABELS[self._wave_combo.currentText()],
-            rate_ticks   = _RATE_TICKS[self._rate_spin.value()],
-            depth        = _ui_to_midi(self._depth_spin.value()),
-            center_value = _ui_to_midi(self._center_spin.value()),
-        )
-        self._engine.add_lfo(lfo)
-        self._active_lfos.append(lfo)
+        selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
+        if not selected:
+            return
+        param            = PARAMETER_LABELS[self._param_combo.currentText()]
+        wave             = LFO_WAVE_LABELS[self._wave_combo.currentText()]
+        rate_ticks       = _RATE_TICKS[self._rate_spin.value()]
+        depth            = _ui_to_midi(self._depth_spin.value())
+        center_value     = _ui_to_midi(self._center_spin.value())
+        invert_secondary = self._invert_check.isChecked()
+        for i, track in enumerate(selected):
+            lfo = LfoClip(
+                track        = track,
+                parameter    = param,
+                wave         = wave,
+                rate_ticks   = rate_ticks,
+                depth        = depth,
+                center_value = center_value,
+                inverted     = invert_secondary and i > 0,
+            )
+            self._engine.add_lfo(lfo)
+            self._active_lfos.append(lfo)
         self._refresh_list()
 
     def _on_stop_selected(self) -> None:
@@ -630,14 +683,14 @@ class LfoPanel(QFrame):
         for lfo in self._active_lfos:
             lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
             hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
-            # Compute human-readable rate from ticks
             if lfo.rate_ticks >= PPQN:
                 rate_str = f"{lfo.rate_ticks // PPQN}b/cycle"
             else:
                 rate_str = f"{PPQN // lfo.rate_ticks}×/beat"
+            inv_str = " [inv]" if lfo.inverted else ""
             self._lfo_list.addItem(QListWidgetItem(
                 f"T{lfo.track}  {lfo.parameter.value.upper()[:3]}  "
-                f"{lfo.wave.value}  {lo}↔{hi}  {rate_str}"
+                f"{lfo.wave.value}  {lo}↔{hi}  {rate_str}{inv_str}"
             ))
 
     def on_beat(self, beat_count: int) -> None:
