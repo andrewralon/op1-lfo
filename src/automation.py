@@ -174,7 +174,6 @@ class AutomationEngine:
         self._last_sent: dict[int, int] = {}
 
         self._lfos: list[LfoClip] = []
-        self._lfo_starts: dict[int, int] = {}
         self._lfo_last_sent: dict[int, int] = {}
 
     # ------------------------------------------------------------------
@@ -217,7 +216,6 @@ class AutomationEngine:
     def remove_lfo(self, lfo: LfoClip) -> None:
         with self._lock:
             self._lfos = [l for l in self._lfos if l is not lfo]
-            self._lfo_starts.pop(id(lfo), None)
             self._lfo_last_sent.pop(id(lfo), None)
 
     def remove_lfos_by_track(self, track: int) -> None:
@@ -225,13 +223,11 @@ class AutomationEngine:
             gone = [l for l in self._lfos if l.track == track]
             self._lfos = [l for l in self._lfos if l.track != track]
             for l in gone:
-                self._lfo_starts.pop(id(l), None)
                 self._lfo_last_sent.pop(id(l), None)
 
     def clear_lfos(self) -> None:
         with self._lock:
             self._lfos.clear()
-            self._lfo_starts.clear()
             self._lfo_last_sent.clear()
 
     @property
@@ -312,14 +308,7 @@ class AutomationEngine:
             self._update_cb(clip.track, clip.parameter, value)
 
     def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> None:
-        lfo_id = id(lfo)
-        with self._lock:
-            if lfo_id not in self._lfo_starts:
-                self._lfo_starts[lfo_id] = tick_count
-            start_tick = self._lfo_starts[lfo_id]
-
-        elapsed = tick_count - start_tick
-        phase = (elapsed % lfo.rate_ticks) / lfo.rate_ticks
+        phase = (tick_count % lfo.rate_ticks) / lfo.rate_ticks
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
 

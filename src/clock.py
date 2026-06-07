@@ -104,6 +104,10 @@ class ClockListener:
             for msg in self._port.iter_pending():
                 if msg.type == "clock":
                     self._handle_tick()
+                elif msg.type == "start":
+                    self._handle_start()
+                elif msg.type == "songpos":
+                    self._handle_songpos(msg.pos)
                 elif msg.type == "control_change" and self._cc_callback:
                     self._cc_callback(msg.channel, msg.control, msg.value)
             # Yield the GIL briefly rather than busy-spinning
@@ -145,6 +149,18 @@ class ClockListener:
         if is_beat and self._beat_callback:
             self._beat_callback(beat_num)
 
+    def _handle_start(self) -> None:
+        """OP-1 tape rewound and started — reset position to song beginning."""
+        with self._lock:
+            self._tick_count = 0
+            self._beat_count = 0
+
+    def _handle_songpos(self, pos: int) -> None:
+        """Jump to a specific tape position (MIDI SPP: 1 unit = 6 ticks at 24 PPQN)."""
+        with self._lock:
+            self._tick_count = pos * 6
+            self._beat_count = self._tick_count // PPQN
+
 
 class MidiClockGenerator:
     """
@@ -174,7 +190,6 @@ class MidiClockGenerator:
         self._spp_pos       = 0    # MIDI beats (1 beat = 6 ticks); tracks resume position
         self._spp_tick_rem  = 0    # ticks accumulated toward next MIDI beat
         self._tick_count    = 0
-        self._beat_count    = 0
         self._thread = threading.Thread(target=self._run, daemon=True, name="ClockGenerator")
         self._thread.start()
 
@@ -203,6 +218,8 @@ class MidiClockGenerator:
         if self._has_started:
             self._port.send(mido.Message("continue"))
         else:
+            self._spp_pos = 0
+            self._spp_tick_rem = 0
             self._port.send(mido.Message("start"))
             self._has_started = True
 
@@ -248,11 +265,10 @@ class MidiClockGenerator:
                     if self._spp_tick_rem >= 6:
                         self._spp_tick_rem = 0
                         self._spp_pos += 1
-                is_beat = self._tick_count % PPQN == 0
-                if is_beat:
-                    self._beat_count += 1
+                song_tick = self._spp_pos * 6 + self._spp_tick_rem
+                is_beat = self._playing and song_tick % PPQN == 0
                 if self._tick_callback:
-                    self._tick_callback(self._tick_count, self._beat_count)
+                    self._tick_callback(song_tick, song_tick // PPQN)
                 if is_beat and self._beat_callback:
-                    self._beat_callback(self._beat_count)
+                    self._beat_callback(song_tick // PPQN)
             last_tick = next_tick
