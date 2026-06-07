@@ -1,13 +1,13 @@
 # op1-lfo
 
-![op1-lfo beat match mode](images/ss-beat-match.png)
-![op1-lfo midi sync mode](images/ss-midi-sync.png)
-
 Custom MIDI LFOs (low frequency oscillators) for the Teenage Engineering OP-1 Field synthesizer to control per-track volume, pan, and mute with automation curves. 
 
+![beat match](images/ss-beat-match.png)
+![sync mode](images/ss-midi-sync.png)
+
 This app handles two different MIDI clock tempo modes:
-1. Beat Match -> OP1 sends clock to app: used to sync the LFOs
-2. Midi Sync -> app sends clock to OP1: generates tempo, transport, and tape navigation commands
+1. `Beat Match` -> OP1 sends clock to app: used to sync the LFOs
+2. `Midi Sync` -> app sends clock to OP1: generates tempo, transport, and tape navigation commands
 
 ---
 
@@ -166,11 +166,26 @@ A live preview of the selected waveform shape is drawn in the panel. The number 
 | **Center** | The midpoint value the LFO oscillates around |
 | **Range** | Readout showing the min–max value the LFO will reach, derived from Center ± Depth |
 
+#### Inverted LFOs
+
+When two or more tracks are selected, the **Invert 2nd+** checkbox becomes available. With it checked, the first selected track gets the normal waveform and every additional track gets the same waveform flipped upside-down — its output is `center - (wave × depth)` instead of `center + (wave × depth)`.
+
+This means when the primary track's value rises, the secondary tracks' values fall by the same amount, and vice versa. Some uses:
+
+- **Stereo pan spread** — assign the same LFO to tracks 1 and 2 with Pan selected and Invert enabled. Track 1 sweeps left while track 2 sweeps right, keeping an even stereo image.
+- **Pumping sidechain feel** — automate Volume on two tracks so one ducks while the other swells.
+- **Call and response** — run an inverted LFO on a second melody track so phrases naturally dovetail rather than stack.
+
+The active LFO list marks inverted clips with `[inv]` so you can tell them apart at a glance.
+
+![inverted lfo 1](images/ss-inverted-lfo-1.png)
+![inverted lfo 2](images/ss-inverted-lfo-2.png)
+
 #### Buttons
 
 | Button | Action |
 |--------|--------|
-| **Start** | Begin LFO automation on the selected track and parameter |
+| **Start** | Begin LFO automation on the selected tracks and parameter |
 | **Stop Selected** | Stop automation on the currently selected clip |
 | **Stop All** | Stop all running automation clips immediately |
 
