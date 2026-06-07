@@ -1,4 +1,4 @@
-# op1-lfo
+# op1-lfo-hero
 
 Custom MIDI LFOs (low frequency oscillators) for the Teenage Engineering OP-1 Field synthesizer to control per-track volume, pan, and mute with automation curves. 
 
