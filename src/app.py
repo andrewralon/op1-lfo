@@ -23,6 +23,8 @@ def main() -> None:
 
     try:
         in_port, out_port = connect()
+    except KeyboardInterrupt:
+        sys.exit(0)
     except Exception as exc:
         QMessageBox.critical(None, "MIDI Connection Failed", str(exc))
         sys.exit(1)

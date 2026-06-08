@@ -6,6 +6,8 @@ controller.py.  The OP-1 exposes one combined MIDI in/out port; we open
 input for receiving clock and output for sending CC.
 """
 
+import sys
+
 import mido
 
 
@@ -29,7 +31,9 @@ def _prompt_user(names: list[str], direction: str) -> str:
     for i, name in enumerate(names):
         print(f"  [{i}] {name}")
     while True:
-        raw = input(f"Select {direction} port number: ").strip()
+        raw = input(f"Select {direction} port number (or q to quit): ").strip()
+        if raw.lower() in ("q", "quit"):
+            sys.exit(0)
         if raw.isdigit() and 0 <= int(raw) < len(names):
             return names[int(raw)]
         print("Invalid selection, try again.")
