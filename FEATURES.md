@@ -2,8 +2,13 @@
 
 ## To do
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
-- [ ] Graceful MIDI disconnect: detect OP-1 unplug mid-session, show reconnect dialog instead of crashing
+- [ ] Graceful MIDI disconnect: detect OP-1 unplug mid-session, update UI to reflect disconnected state, show reconnect dialog instead of crashing
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
+- [ ] Startup tempo mode detection: detect whether OP-1 is in Beat Match or MIDI Sync mode at launch and set the UI accordingly
+- [ ] BPM as LFO target: expose BPM as an automation parameter so LFOs can modulate app (and therefore OP-1 clock) tempo
+- [ ] Per-track FX + LFO params: add OP-1 MIDI CC params for per-track FX controls and per-track LFO settings (see OP-1 MIDI spec)
+- [ ] Master FX params: add OP-1 MIDI CC params for master FX controls (see OP-1 MIDI spec)
+- [ ] Master volume + compression params: add OP-1 MIDI CC params for master volume and master compression (see OP-1 MIDI spec)
 
 ## Not possible
 - ✗ OP-1 → App sync: the OP-1 Field does not transmit CC messages when its mixer controls are changed, so there is no way to detect volume, pan, or mute state from the device side over MIDI
@@ -27,3 +32,4 @@
 - [x] BPM spinbox: set tempo 20–300 BPM with one decimal place; arrow keys update live, Enter commits typed value
 - [x] Octave shift: CC 79 (< 64 = down, ≥ 64 = up) — note: only active on OP-1 in keyboard/synth mode, not tape mode
 - [x] LFO panel: waveform preview, rate/depth/center controls, range readout on same row, Start/Stop Selected/Stop All
+- [x] LFO Random curve: sample-and-hold waveform — 8 steps per cycle, each holding a deterministic pseudo-random value
