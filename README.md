@@ -20,72 +20,12 @@ This app handles two different MIDI clock tempo modes:
 
 ---
 
-## Installation
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/andrewralon/op1-midi.git
-cd op1-midi
-```
-
-### 2. Create a virtual environment
-
-```bash
-python3 -m venv venv
-```
-
-### 3. Activate the virtual environment
-
-**macOS / Linux:**
-```bash
-source venv/bin/activate
-```
-
-**Windows:**
-```cmd
-venv\Scripts\activate
-```
-
-You should see `(venv)` in your terminal prompt.
-
-### 4. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-This installs:
-- `mido` — MIDI I/O library
-- `python-rtmidi` — low-latency MIDI backend for mido
-- `PyQt6` — desktop UI framework
-- `numpy` — used by the automation engine
-
----
-
-## OP-1 Field Configuration
-
-Before launching the app, configure the OP-1 Field to receive MIDI clock from an external source.
-
-### Enable MIDI Sync mode
-
-1. On the OP-1 Field, press and hold **COM** (the shift key)
-2. Navigate to **MIDI** settings
-3. Set **SYNC** to **MIDI** (not INT or USB)
-
-In this mode the OP-1 tape transport is slaved to incoming MIDI clock. The OP-1's BPM display will show `--` until it receives a clock signal — this is normal.
-
-### Connect via USB-C
-
-Plug the OP-1 Field into your computer with a USB-C data cable. The device should appear as a MIDI port automatically on macOS. No driver installation is required.
-
----
-
 ## Running the App
 
 With the OP-1 connected and the virtual environment activated:
 
 ```bash
+source venv/bin/activate
 python -m src.app
 ```
 
@@ -106,11 +46,11 @@ The status bar at the bottom of the window shows the connected port name once MI
 | **←** | Sends CC 82 (tape previous bar) and updates the song position pointer. |
 | **→** | Sends CC 83 (tape next bar) and updates the song position pointer. |
 
-**Note:** The OP-1 must be in MIDI Sync mode for Play/Stop/←/→ to affect the tape. In other modes these buttons have no effect on tape transport.
+**Note:** The OP-1 must be in `Midi Sync` mode for Play/Stop/←/→ to affect the tape. In other modes these buttons have no effect on tape transport.
 
 ---
 
-### BPM Control (right column)
+### BPM
 
 - Displays the current tempo with one decimal place (e.g. `120.0`)
 - The app generates a continuous **24 PPQN MIDI clock** signal — the OP-1 locks to this tempo in MIDI Sync mode
@@ -131,19 +71,19 @@ Each of the four tracks corresponds to an OP-1 Field mixer channel (tracks 1–4
 - Click to toggle mute on/off; the button dims when muted
 - Sends CC 9 (127 = muted, 0 = unmuted)
 
-#### Volume fader
-- Vertical slider, range 0–99 (maps to MIDI 0–127)
-- Default: **90** (MIDI 115)
-- The filled portion below the handle turns red to show the current level
-- The numeric value is shown below the fader
-- Drag or click to adjust; sends CC 7
-
 #### Pan knob
 - Dark circular dial below the fader
 - Center position (12 o'clock) = center pan (MIDI 64) — line is **orange**
 - Off-center — line is **white**, pointing toward the pan direction
 - Click and drag up/down to adjust; sends CC 10
 - Labels: **L** (left) and **R** (right)
+
+#### Volume fader
+- Vertical slider, range 0–99 (maps to MIDI 0–127)
+- Default: **90** (MIDI 115)
+- The filled portion below the handle turns red to show the current level
+- The numeric value is shown below the fader
+- Drag or click to adjust; sends CC 7
 
 ---
 
@@ -191,6 +131,49 @@ The active LFO list marks inverted clips with `[inv]` so you can tell them apart
 
 ---
 
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/andrewralon/op1-midi.git
+cd op1-midi
+```
+
+### 2. Create a virtual environment
+
+```bash
+python3 -m venv venv
+```
+
+### 3. Activate the virtual environment
+
+**macOS / Linux:**
+```bash
+source venv/bin/activate
+```
+
+**Windows:**
+```cmd
+venv\Scripts\activate
+```
+
+You should see `(venv)` in your terminal prompt.
+
+### 4. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs:
+- `mido` — MIDI I/O library
+- `python-rtmidi` — low-latency MIDI backend for mido
+- `PyQt6` — desktop UI framework
+- `numpy` — used by the automation engine
+
+---
+
 ## Troubleshooting
 
 **App shows "MIDI Connection Failed"**
@@ -233,3 +216,5 @@ The active LFO list marks inverted clips with `[inv]` so you can tell them apart
 | Continue| 0xFB | Resume from current song position |
 | Stop    | 0xFC | Halt playback |
 | Song Position Pointer | 0xF2 | Sets resume position in MIDI beats |
+
+OP-1 Field Midi Reference: https://teenage.engineering/guides/op-1#midi-reference
