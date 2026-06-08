@@ -1,6 +1,8 @@
 # Features
 
 ## To do
+- [ ] Show selected LFOs in waveform view: when running, display selected active LFOs in the waveform preview (fall back to all active LFOs if none are selected)
+- [ ] LFO curve colors match tracks: color each LFO automation curve to match its assigned track color(s)
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Graceful MIDI disconnect: detect OP-1 unplug mid-session, update UI to reflect disconnected state, show reconnect dialog instead of crashing
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
