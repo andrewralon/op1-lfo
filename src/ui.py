@@ -24,10 +24,12 @@ from src.automation import (
 # ---------------------------------------------------------------------------
 # Colors
 # ---------------------------------------------------------------------------
+### GENERAL
+_BLACK      = "#000000"
 _BG         = "#111111"
 _PANEL      = "#1e1e1e"
-_ACCENT     = "#4ec94e"
 _MUTE_OFF   = "#2a2a2a"
+_ACCENT     = "#4ec94e"
 _TEXT       = "#d8d8d8"
 _DIM        = "#aaaaaa"
 _BLUE_1     = "#4477bb" # button 1
@@ -42,6 +44,11 @@ _GRAY       = "#555555"
 _GREEN      = "#4ec94e"
 _DARKGREEN  = "#1e4a1e"
 _RED        = "#ff4444"
+_BORDER     = "#2e2e2e"
+_FADER      = "#888888"
+_GROOVE     = "#333333"
+_KNOB_RIM   = "#777777"
+_HOVER      = "#3a3a3a"
 
 # OP-1 Field per-track colors, matched from the device's mixer screen
 TRACK_COLORS = {
@@ -138,7 +145,7 @@ class PanDial(QDial):
         r = min(cx, cy) - 2.0
 
         # Knob body
-        p.setPen(QPen(QColor("#777777"), 1.0))
+        p.setPen(QPen(QColor(_KNOB_RIM), 1.0))
         p.setBrush(QColor(_GRAY))
         p.drawEllipse(QPointF(cx, cy), r, r)
 
@@ -178,7 +185,7 @@ class WaveformPreview(QWidget):
         self.setFixedHeight(65)
         self.setStyleSheet(
             f"background-color: {_BG};"
-            "border: 1px solid #2e2e2e;"
+            f"border: 1px solid {_BORDER};"
             "border-radius: 4px;"
         )
 
@@ -205,7 +212,7 @@ class WaveformPreview(QWidget):
         amplitude = h / 2.0 - pad
 
         # Center dashed line
-        p.setPen(QPen(QColor("#333333"), 1, Qt.PenStyle.DashLine))
+        p.setPen(QPen(QColor(_GROOVE), 1, Qt.PenStyle.DashLine))
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
         # Cycles visible = how many full cycles fit in one beat at this rate
@@ -249,7 +256,7 @@ class TrackStrip(QFrame):
             "QFrame#TrackStrip {"
             f"  background-color: {_PANEL};"
             "   border-radius: 10px;"
-            "   border: 1px solid #2e2e2e;"
+            f"   border: 1px solid {_BORDER};"
             "}"
         )
         self.setFixedWidth(100)
@@ -317,7 +324,7 @@ class TrackStrip(QFrame):
         self._vol_slider.setFixedWidth(28)
         self._vol_slider.setStyleSheet(
             "QSlider::groove:vertical {"
-            "  width: 4px; background-color: #333333; border-radius: 2px;"
+            f"  width: 4px; background-color: {_GROOVE}; border-radius: 2px;"
             "}"
             "QSlider::sub-page:vertical {"
             f"  background-color: {_GRAY}; border-radius: 2px; width: 4px;"
@@ -326,7 +333,7 @@ class TrackStrip(QFrame):
             f"  background-color: {_RED}; border-radius: 2px; width: 4px;"
             "}"
             "QSlider::handle:vertical {"
-            "  background-color: #888888; border: none;"
+            f"  background-color: {_FADER}; border: none;"
             "  width: 20px; height: 8px;"
             "  margin: 0 -8px; border-radius: 3px;"
             "}"
@@ -356,8 +363,8 @@ class TrackStrip(QFrame):
 
     def _set_mute_style(self, muted: bool) -> None:
         color = TRACK_COLORS[self._track]
-        bg = "#111111" if muted else color
-        fg = color     if muted else "#000000"
+        bg = _BG    if muted else color
+        fg = color  if muted else _BLACK
         self._mute_btn.setStyleSheet(
             f"QPushButton {{"
             f"  background-color: {bg}; color: {fg};"
@@ -448,7 +455,7 @@ class LfoPanel(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
             f"LfoPanel {{ background-color: {_PANEL}; border-radius: 8px;"
-            f"  border: 1px solid #2e2e2e; }}"
+            f"  border: 1px solid {_BORDER}; }}"
         )
 
         root = QVBoxLayout(self)
@@ -550,7 +557,7 @@ class LfoPanel(QFrame):
         use_cur_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 10pt; }}"
-            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+            f"QPushButton:hover {{ background-color: {_HOVER}; }}"
         )
         use_cur_btn.clicked.connect(self._on_use_current)
 
@@ -576,7 +583,7 @@ class LfoPanel(QFrame):
         start_btn = QPushButton("▶  Start")
         start_btn.setFixedHeight(28)
         start_btn.setStyleSheet(
-            f"QPushButton {{ background-color: #1e4a1e; color: {_TEXT};"
+            f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 11pt; }}"
             f"QPushButton:hover {{ background-color: #2a6a2a; }}"
         )
@@ -587,7 +594,7 @@ class LfoPanel(QFrame):
         stop_sel_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 11pt; }}"
-            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+            f"QPushButton:hover {{ background-color: {_HOVER}; }}"
         )
         stop_sel_btn.clicked.connect(self._on_stop_selected)
 
@@ -596,7 +603,7 @@ class LfoPanel(QFrame):
         stop_all_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_DIM};"
             f"  border: none; border-radius: 4px; font-size: 11pt; }}"
-            f"QPushButton:hover {{ background-color: #3a3a3a; color: {_TEXT}; }}"
+            f"QPushButton:hover {{ background-color: {_HOVER}; color: {_TEXT}; }}"
         )
         stop_all_btn.clicked.connect(self._on_stop_all)
 
@@ -612,7 +619,7 @@ class LfoPanel(QFrame):
         self._lfo_list = QListWidget()
         self._lfo_list.setStyleSheet(
             f"QListWidget {{ background-color: {_BG}; color: {_TEXT};"
-            f"  border: 1px solid #2e2e2e; border-radius: 4px; font-size: 10pt; }}"
+            f"  border: 1px solid {_BORDER}; border-radius: 4px; font-size: 10pt; }}"
         )
         self._lfo_list.setMaximumHeight(70)
         root.addWidget(self._lfo_list)
@@ -646,7 +653,7 @@ class LfoPanel(QFrame):
             color = TRACK_COLORS[t]
             if btn.isChecked():
                 style = (
-                    f"QPushButton {{ background-color: {color}; color: #000000;"
+                    f"QPushButton {{ background-color: {color}; color: {_BLACK};"
                     f"  border: none; border-radius: 4px; font-size: 11pt; font-weight: bold; }}"
                     f"QPushButton:hover {{ background-color: {color}; }}"
                 )
@@ -654,7 +661,7 @@ class LfoPanel(QFrame):
                 style = (
                     f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_DIM};"
                     f"  border: none; border-radius: 4px; font-size: 11pt; font-weight: bold; }}"
-                    f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+                    f"QPushButton:hover {{ background-color: {_HOVER}; }}"
                 )
             btn.setStyleSheet(style)
         self._invert_check.setEnabled(selected_count >= 2)
@@ -775,7 +782,7 @@ class MainWindow(QMainWindow):
         _btn_ss = (
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 5px; font-size: 14pt; }}"
-            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+            f"QPushButton:hover {{ background-color: {_HOVER}; }}"
             f"QPushButton:pressed {{ background-color: #4a4a4a; }}"
         )
 
@@ -852,8 +859,8 @@ class MainWindow(QMainWindow):
         _bpm_btn_ss = (
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 3px; font-size: 11pt; padding: 0px; }}"
-            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
-            f"QPushButton:disabled {{ color: #3a3a3a; background-color: #1e1e1e; }}"
+            f"QPushButton:hover {{ background-color: {_HOVER}; }}"
+            f"QPushButton:disabled {{ color: {_HOVER}; background-color: {_PANEL}; }}"
         )
         self._bpm_up_btn = QPushButton("▲")
         self._bpm_up_btn.setFixedSize(22, 22)
@@ -907,9 +914,9 @@ class MainWindow(QMainWindow):
         self._mode_btn = QPushButton(_MODE_LABEL[TempoMode.APP_CLOCK])
         self._mode_btn.setStyleSheet(
             f"QPushButton {{ color: {_DIM}; background-color: transparent;"
-            f"  border: 1px solid #333333; border-radius: 4px;"
+            f"  border: 1px solid {_GROOVE}; border-radius: 4px;"
             f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
-            f"QPushButton:hover {{ border-color: #555555; }}"
+            f"QPushButton:hover {{ border-color: {_GRAY}; }}"
         )
         self._mode_btn.clicked.connect(self._toggle_mode)
 
