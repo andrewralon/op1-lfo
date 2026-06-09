@@ -478,7 +478,6 @@ class LfoPanel(QFrame):
         tf = QFont()
         tf.setPointSize(14)
         tf.setBold(True)
-        tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
         title.setFont(tf)
         title.setStyleSheet(f"color: {_DIM};")
         hdr.addWidget(title)
@@ -627,21 +626,16 @@ class LfoPanel(QFrame):
         btn_col.addWidget(stop_btn)
         btn_col.addWidget(clear_btn)
 
-        lfo_col = QVBoxLayout()
-        lfo_col.setSpacing(4)
-        lfo_col.setContentsMargins(0, 0, 0, 0)
-        lfo_col.addWidget(self._dim_label("Active LFOs"))
-
         self._lfo_list = QListWidget()
         self._lfo_list.setStyleSheet(
             f"QListWidget {{ background-color: {_BG}; color: {_TEXT};"
             f"  border: 1px solid {_BORDER}; border-radius: 4px; font-size: 10pt; }}"
         )
-        self._lfo_list.setFixedHeight(72)
-        lfo_col.addWidget(self._lfo_list)
+        self._lfo_list.setFixedHeight(96)  # 3×28px buttons + 2×6px gaps
 
         bottom_row.addLayout(btn_col)
-        bottom_row.addLayout(lfo_col, stretch=1)
+        bottom_row.addWidget(self._dim_label("Active LFOs"), alignment=Qt.AlignmentFlag.AlignTop)
+        bottom_row.addWidget(self._lfo_list, stretch=1)
         root.addLayout(bottom_row)
 
         # Wire up live preview
@@ -800,14 +794,14 @@ class MainWindow(QMainWindow):
         # ── Transport + octave buttons (left of tracks) ──
         _btn_ss = (
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
-            f"  border: none; border-radius: 5px; font-size: 14pt; }}"
+            f"  border: none; border-radius: 6px; font-size: 18pt; }}"
             f"QPushButton:hover {{ background-color: {_HOVER}; }}"
             f"QPushButton:pressed {{ background-color: #4a4a4a; }}"
         )
 
         def _make_btn(label: str) -> QPushButton:
             b = QPushButton(label)
-            b.setFixedSize(38, 32)
+            b.setFixedSize(44, 44)
             b.setStyleSheet(_btn_ss)
             return b
 
@@ -822,17 +816,20 @@ class MainWindow(QMainWindow):
         oct_right_btn.clicked.connect(clock_gen.tape_next_bar)
 
         transport_row = QHBoxLayout()
-        transport_row.setSpacing(4)
+        transport_row.setSpacing(8)
         transport_row.addWidget(play_btn)
         transport_row.addWidget(stop_btn)
 
         octave_row = QHBoxLayout()
-        octave_row.setSpacing(4)
+        octave_row.setSpacing(8)
         octave_row.addWidget(oct_left_btn)
         octave_row.addWidget(oct_right_btn)
 
-        btn_col = QVBoxLayout()
-        btn_col.setSpacing(6)
+        btn_widget = QWidget()
+        btn_widget.setFixedWidth(105)
+        btn_col = QVBoxLayout(btn_widget)
+        btn_col.setSpacing(10)
+        btn_col.setContentsMargins(0, 0, 0, 0)
         btn_col.addStretch()
         btn_col.addLayout(transport_row)
         btn_col.addLayout(octave_row)
@@ -842,14 +839,14 @@ class MainWindow(QMainWindow):
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(10)
         tracks_row.addStretch()
-        tracks_row.addLayout(btn_col)
+        tracks_row.addWidget(btn_widget)
         for t in (1, 2, 3, 4):
             strip = TrackStrip(t, controller)
             self._strips[t] = strip
             tracks_row.addWidget(strip)
 
         bpm_widget = QWidget()
-        bpm_widget.setFixedWidth(130)
+        bpm_widget.setFixedWidth(105)
         bpm_layout = QVBoxLayout(bpm_widget)
         bpm_layout.setSpacing(1)
         bpm_layout.setContentsMargins(2, 0, 2, 0)
