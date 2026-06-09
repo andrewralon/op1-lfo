@@ -28,9 +28,8 @@ Goal: detect which of the OP-1 Field's 6 tempo modes is active at launch so the 
   +2.060s  Message('sysex', data=(126, 127, 6, 1), time=0)
   +3.102s  Message('sysex', data=(126, 127, 6, 1), time=0)
 ```
-_(Earlier "no messages" result was from a cold/unresponsive OP-1, not a mode difference.)_
 
-### MIDI Sync
+### MIDI SYNC
 ```
 [startup] 4 total messages — counts by type: {'sysex': 4}
 [startup] Non-clock messages:
@@ -41,7 +40,7 @@ _(Earlier "no messages" result was from a cold/unresponsive OP-1, not a mode dif
 ```
 _Identical to FREE — confirmed indistinguishable via MIDI._
 
-### Beat Match (tape playing, ~78 BPM)
+### BEAT MATCH (tape playing, ~78 BPM)
 ```
 [startup] 160 total messages — counts by type: {'clock': 156, 'sysex': 4}
 [startup] Clock jitter: mean=32.049ms  stddev=3.652ms  BPM≈78.0
@@ -52,7 +51,18 @@ _Identical to FREE — confirmed indistinguishable via MIDI._
   +3.110s  Message('sysex', data=(126, 127, 6, 1), time=0)
 ```
 
-### PO Sync
+BEAT MATCH take 2:
+```
+[startup] 160 total messages — counts by type: {'sysex': 4, 'clock': 156}
+[startup] Clock jitter: mean=31.871ms  stddev=3.400ms  BPM≈78.4
+[startup] Non-clock messages:
+  +0.059s  Message('sysex', data=(126, 2, 6, 2, 0, 32, 118, 2, 1, 2, 0, 0, 0, 0, 0), time=0)
+  +1.047s  Message('sysex', data=(126, 127, 6, 1), time=0)
+  +2.101s  Message('sysex', data=(126, 127, 6, 1), time=0)
+  +3.132s  Message('sysex', data=(126, 127, 6, 1), time=0)
+```
+
+### PO SYNC
 ```
 [startup] 160 total messages — counts by type: {'sysex': 4, 'clock': 156}
 [startup] Clock jitter: mean=31.738ms  stddev=4.027ms  BPM≈78.8
@@ -63,7 +73,18 @@ _Identical to FREE — confirmed indistinguishable via MIDI._
   +3.104s  Message('sysex', data=(126, 127, 6, 1), time=0)
 ```
 
-### 1/16
+PO SYNC take 2:
+```
+[startup] 160 total messages — counts by type: {'sysex': 4, 'clock': 156}
+[startup] Clock jitter: mean=31.808ms  stddev=3.652ms  BPM≈78.6
+[startup] Non-clock messages:
+  +0.059s  Message('sysex', data=(126, 2, 6, 2, 0, 32, 118, 2, 1, 2, 0, 0, 0, 0, 0), time=0)
+  +1.043s  Message('sysex', data=(126, 127, 6, 1), time=0)
+  +2.085s  Message('sysex', data=(126, 127, 6, 1), time=0)
+  +3.127s  Message('sysex', data=(126, 127, 6, 1), time=0)
+```
+
+### 1/16 SYNC
 ```
 [startup] 160 total messages — counts by type: {'sysex': 4, 'clock': 156}
 [startup] Clock jitter: mean=31.838ms  stddev=3.670ms  BPM≈78.5
