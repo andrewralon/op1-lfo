@@ -24,18 +24,25 @@ from src.automation import (
 # ---------------------------------------------------------------------------
 # Colors
 # ---------------------------------------------------------------------------
-### GENERAL
-_BLACK      = "#000000"
+### UI ELEMENTS
 _BG         = "#111111"
 _PANEL      = "#1e1e1e"
 _MUTE_OFF   = "#2a2a2a"
 _ACCENT     = "#4ec94e"
 _TEXT       = "#d8d8d8"
 _DIM        = "#aaaaaa"
+_BORDER     = "#2e2e2e"
+_FADER      = "#888888"
+_GROOVE     = "#333333"
+_KNOB_RIM   = "#777777"
+_HOVER      = "#3a3a3a"
+### OP-1 PALETTE
 _BLUE_1     = "#4477bb" # button 1
 _OCHRE_2    = "#bb9933" # button 2
 _GRAY_3     = "#848C94" # button 3
 _ORANGE_4   = "#ff6a00" # button 4
+### MORE COLORS
+_BLACK      = "#000000"
 _BLUESTEEL  = "#132542"
 _GOLD       = "#fddf28"
 _BLUEGRAY   = "#5c5c74"
@@ -44,11 +51,6 @@ _GRAY       = "#555555"
 _GREEN      = "#4ec94e"
 _DARKGREEN  = "#1e4a1e"
 _RED        = "#ff4444"
-_BORDER     = "#2e2e2e"
-_FADER      = "#888888"
-_GROOVE     = "#333333"
-_KNOB_RIM   = "#777777"
-_HOVER      = "#3a3a3a"
 
 # OP-1 Field per-track colors, matched from the device's mixer screen
 TRACK_COLORS = {
