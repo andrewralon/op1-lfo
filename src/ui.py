@@ -494,18 +494,17 @@ class LfoPanel(QFrame):
             self._track_btns[t] = btn
             hdr.addWidget(btn)
 
-        hdr.addSpacing(8)
+        hdr.addSpacing(16)
         self._param_combo = self._make_combo(list(PARAMETER_LABELS))
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
 
-        for lbl_text, widget in [
-            ("Param", self._param_combo),
-            ("Wave",  self._wave_combo),
-        ]:
-            hdr.addWidget(self._dim_label(lbl_text))
-            hdr.addWidget(widget)
+        hdr.addWidget(self._dim_label("Param"))
+        hdr.addWidget(self._param_combo)
+        hdr.addSpacing(16)
+        hdr.addWidget(self._dim_label("Wave"))
+        hdr.addWidget(self._wave_combo)
 
-        hdr.addSpacing(12)
+        hdr.addStretch()
         self._invert_check = QCheckBox("Invert 2nd+")
         self._invert_check.setStyleSheet(
             f"QCheckBox {{ color: {_TEXT}; font-size: 12pt; }}"
@@ -528,7 +527,7 @@ class LfoPanel(QFrame):
         root.addWidget(self._preview)
 
         self._range_label = QLabel()
-        self._range_label.setStyleSheet(f"color: {_DIM}; font-size: 9pt;")
+        self._range_label.setStyleSheet(f"color: {_DIM}; font-size: 12pt;")
         self._range_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         # ── Row 3: Rate / Depth / Center ──
