@@ -29,13 +29,13 @@ def _find_op1(names: list[str]) -> str | None:
 def _prompt_user(names: list[str], direction: str) -> str:
     print(f"\nAvailable MIDI {direction} ports:")
     for i, name in enumerate(names):
-        print(f"  [{i}] {name}")
+        print(f"  [{i + 1}] {name}")
     while True:
         raw = input(f"Select {direction} port number (or q to quit): ").strip()
         if raw.lower() in ("q", "quit"):
             sys.exit(0)
-        if raw.isdigit() and 0 <= int(raw) < len(names):
-            return names[int(raw)]
+        if raw.isdigit() and 1 <= int(raw) <= len(names):
+            return names[int(raw) - 1]
         print("Invalid selection, try again.")
 
 
