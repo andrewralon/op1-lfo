@@ -826,12 +826,15 @@ class MainWindow(QMainWindow):
         self._bpm_spin.setSingleStep(1.0)
         self._bpm_spin.setValue(100.0)
         self._bpm_spin.setFixedWidth(96)
+        self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self._bpm_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._bpm_spin.setStyleSheet(
             f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
             f"  font-size: 18pt; font-weight: bold; }}"
         )
         self._bpm_spin.valueChanged.connect(clock_gen.set_bpm)
-        self._bpm_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Fix height so it never changes when _set_mode toggles button symbols
+        self._bpm_spin.setFixedHeight(self._bpm_spin.sizeHint().height())
         bpm_layout.addWidget(self._bpm_spin)
 
         bpm_layout.addStretch()
@@ -900,7 +903,6 @@ class MainWindow(QMainWindow):
             # OP-1 is clock master — disable our clock output, BPM is read-only
             self._clock_gen.disable_clock()
             self._bpm_spin.setReadOnly(True)
-            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
             self._bpm_spin.setStyleSheet(
                 f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
@@ -909,7 +911,6 @@ class MainWindow(QMainWindow):
             # App is clock master — enable our clock output, BPM is editable
             self._clock_gen.enable_clock()
             self._bpm_spin.setReadOnly(False)
-            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
             self._bpm_spin.setStyleSheet(
                 f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
