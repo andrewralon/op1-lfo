@@ -195,7 +195,9 @@ class WaveformPreview(QWidget):
         self._depth      = 20
         self._center     = 64
         self._phase      = 0.0
-        self._rate_ticks = PPQN   # default: 1 cycle per beat
+        self._rate_ticks      = PPQN   # default: 1 cycle per beat
+        self._normal_colors: list[str]   = [_ACCENT]
+        self._inverted_colors: list[str] = []
         self.setFixedHeight(65)
         self.setStyleSheet(
             f"background-color: {_BG};"
@@ -213,6 +215,13 @@ class WaveformPreview(QWidget):
     def set_phase(self, phase: float) -> None:
         self._phase = phase
         self.update()
+
+    def set_colors(self, normal_colors: list[str], inverted_colors: list[str]) -> None:
+        self._normal_colors   = normal_colors if normal_colors else [_ACCENT]
+        self._inverted_colors = inverted_colors
+        self.update()
+
+    _SEGMENT_PX = 16  # pixels per color alternation segment when multiple tracks are selected
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -232,24 +241,44 @@ class WaveformPreview(QWidget):
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
         # Cycles visible = how many full cycles fit in one beat at this rate
-        n_cycles = 8.0 * PPQN / self._rate_ticks   # 2 beats of content; e.g. 0.5 for rate 1, 16.0 for rate 8
+        n_cycles = 8.0 * PPQN / self._rate_ticks
         steps    = w * 2
-        pen = QPen(QColor(_ACCENT), 2)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
 
-        prev_pt = None
+        self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._normal_colors, inverted=False)
+        if self._inverted_colors:
+            self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._inverted_colors, inverted=True)
+
+        p.end()
+
+    def _draw_curve(
+        self, p: QPainter, steps: int, w: int, cy: float, amplitude: float,
+        n_cycles: float, colors: list[str], *, inverted: bool,
+    ) -> None:
+        single     = len(colors) == 1
+        prev_pt    = None
+        prev_color = None
         for i in range(steps + 1):
             phase  = (i / steps) * n_cycles
             y_norm = lfo_wave_value(phase % 1.0, self._wave)
-            px     = float(i) * w / steps
-            py     = cy - y_norm * amplitude
-            pt     = QPointF(px, py)
+            if inverted:
+                y_norm = -y_norm
+            px = float(i) * w / steps
+            py = cy - y_norm * amplitude
+            pt = QPointF(px, py)
             if prev_pt is not None:
+                if single:
+                    color = colors[0]
+                else:
+                    mid_x     = (prev_pt.x() + pt.x()) / 2.0
+                    color_idx = int(mid_x / self._SEGMENT_PX) % len(colors)
+                    color     = colors[color_idx]
+                if color != prev_color:
+                    pen = QPen(QColor(color), 2)
+                    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                    p.setPen(pen)
+                    prev_color = color
                 p.drawLine(prev_pt, pt)
             prev_pt = pt
-
-        p.end()
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +709,9 @@ class LfoPanel(QFrame):
         self._wave_combo.currentTextChanged.connect(self._update_preview)
         self._depth_spin.valueChanged.connect(self._update_preview)
         self._center_spin.valueChanged.connect(self._update_preview)
+        self._invert_check.toggled.connect(self._update_preview)
+        for btn in self._track_btns.values():
+            btn.toggled.connect(self._update_preview)
         self._update_preview()
 
     # ------------------------------------------------------------------
@@ -749,6 +781,22 @@ class LfoPanel(QFrame):
         wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
         param      = PARAMETER_LABELS[self._param_combo.currentText()]
+
+        if param is Parameter.TEMPO:
+            normal_colors   = [_ACCENT]
+            inverted_colors = []
+        else:
+            selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
+            if not selected:
+                normal_colors   = [_ACCENT]
+                inverted_colors = []
+            elif len(selected) == 1 or not self._invert_check.isChecked():
+                normal_colors   = [TRACK_COLORS[t] for t in selected]
+                inverted_colors = []
+            else:
+                normal_colors   = [TRACK_COLORS[selected[0]]]
+                inverted_colors = [TRACK_COLORS[t] for t in selected[1:]]
+        self._preview.set_colors(normal_colors, inverted_colors)
 
         if param is Parameter.TEMPO:
             center = self._center_spin.value()
