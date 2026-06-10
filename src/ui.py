@@ -453,12 +453,15 @@ class TrackStrip(QFrame):
 # ---------------------------------------------------------------------------
 
 class LfoPanel(QFrame):
-    def __init__(self, engine: AutomationEngine, clock, get_value_fn, parent=None):
+    def __init__(self, engine: AutomationEngine, clock, get_value_fn, get_bpm_fn=None, set_bpm_fn=None, parent=None):
         super().__init__(parent)
-        self._engine      = engine
-        self._clock       = clock
-        self._get_value   = get_value_fn
+        self._engine       = engine
+        self._clock        = clock
+        self._get_value    = get_value_fn
+        self._get_bpm      = get_bpm_fn
+        self._set_bpm      = set_bpm_fn
         self._active_lfos: list[LfoClip] = []
+        self._bpm_original: float | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -553,11 +556,13 @@ class LfoPanel(QFrame):
             f"QSpinBox::up-arrow {{ image: url({_ARROW_UP_SVG}); width: 8px; height: 5px; }}"
             f"QSpinBox::down-arrow {{ image: url({_ARROW_DOWN_SVG}); width: 8px; height: 5px; }}"
         )
+        _double_spin_style = _spin_style.replace("QSpinBox", "QDoubleSpinBox")
 
         self._rate_spin = QSpinBox()
         self._rate_spin.setRange(1, 8)
         self._rate_spin.setValue(3)   # default: 4 beats/cycle
         self._rate_spin.setFixedWidth(56)
+        self._rate_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._rate_spin.setStyleSheet(_spin_style)
 
         self._rate_desc_lbl = QLabel(_RATE_DESC[3])
@@ -571,13 +576,17 @@ class LfoPanel(QFrame):
         self._depth_spin.setRange(0, 49)
         self._depth_spin.setValue(25)
         self._depth_spin.setFixedWidth(66)
+        self._depth_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._depth_spin.setStyleSheet(_spin_style)
 
-        self._center_spin = QSpinBox()
-        self._center_spin.setRange(0, 99)
-        self._center_spin.setValue(50)  # ≈ MIDI 64 (center)
-        self._center_spin.setFixedWidth(66)
-        self._center_spin.setStyleSheet(_spin_style)
+        self._center_spin = QDoubleSpinBox()
+        self._center_spin.setDecimals(1)
+        self._center_spin.setSingleStep(0.1)
+        self._center_spin.setRange(0.0, 99.0)
+        self._center_spin.setValue(50.0)  # ≈ MIDI 64 (center)
+        self._center_spin.setFixedWidth(78)
+        self._center_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._center_spin.setStyleSheet(_double_spin_style)
 
         use_cur_btn = QPushButton("Use current")
         use_cur_btn.setStyleSheet(
@@ -655,7 +664,8 @@ class LfoPanel(QFrame):
         bottom_row.addWidget(self._lfo_list, stretch=1)
         root.addLayout(bottom_row)
 
-        # Wire up live preview
+        # Wire up live preview and param changes
+        self._param_combo.currentTextChanged.connect(self._on_param_changed)
         self._wave_combo.currentTextChanged.connect(self._update_preview)
         self._depth_spin.valueChanged.connect(self._update_preview)
         self._center_spin.valueChanged.connect(self._update_preview)
@@ -680,8 +690,9 @@ class LfoPanel(QFrame):
         return lbl
 
     def _update_track_btn_styles(self) -> None:
-        selected_count = sum(1 for btn in self._track_btns.values() if btn.isChecked())
         for t, btn in self._track_btns.items():
+            if not btn.isEnabled():
+                continue
             color = TRACK_COLORS[t]
             if btn.isChecked():
                 style = (
@@ -697,31 +708,93 @@ class LfoPanel(QFrame):
                 )
             btn.setStyleSheet(style)
 
+    def _on_param_changed(self, text: str) -> None:
+        param = PARAMETER_LABELS.get(text)
+        is_bpm = param is Parameter.BPM
+
+        for btn in self._track_btns.values():
+            btn.setEnabled(not is_bpm)
+        self._invert_check.setEnabled(not is_bpm)
+        self._update_track_btn_styles()
+
+        self._depth_spin.blockSignals(True)
+        self._center_spin.blockSignals(True)
+        if is_bpm:
+            self._depth_spin.setRange(0, 140)
+            self._center_spin.setRange(20.0, 300.0)
+            current_bpm = self._get_bpm() if self._get_bpm else 100.0
+            self._center_spin.setValue(current_bpm)
+            self._depth_spin.setValue(10)
+        else:
+            self._depth_spin.setRange(0, 49)
+            self._center_spin.setRange(0.0, 99.0)
+            self._center_spin.setValue(50.0)
+            self._depth_spin.setValue(25)
+        self._depth_spin.blockSignals(False)
+        self._center_spin.blockSignals(False)
+        self._update_preview()
+
     def _update_preview(self, *_) -> None:
-        wave        = LFO_WAVE_LABELS[self._wave_combo.currentText()]
-        depth_midi  = _ui_to_midi(self._depth_spin.value())
-        center_midi = _ui_to_midi(self._center_spin.value())
-        rate_ticks  = _RATE_TICKS[self._rate_spin.value()]
-        self._preview.set_params(wave, depth_midi, center_midi, rate_ticks)
-        lo = _midi_to_ui(max(0,   center_midi - depth_midi))
-        hi = _midi_to_ui(min(127, center_midi + depth_midi))
-        self._range_label.setText(f"Range: {lo} – {hi}")
+        wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
+        rate_ticks = _RATE_TICKS[self._rate_spin.value()]
+        param      = PARAMETER_LABELS[self._param_combo.currentText()]
+
+        if param is Parameter.BPM:
+            center = self._center_spin.value()
+            depth  = self._depth_spin.value()
+            self._preview.set_params(wave, depth, center, rate_ticks)
+            lo = max(20.0,  center - depth)
+            hi = min(300.0, center + depth)
+            self._range_label.setText(f"Range: {lo:.1f} – {hi:.1f} BPM")
+        else:
+            depth_midi  = _ui_to_midi(self._depth_spin.value())
+            center_midi = _ui_to_midi(self._center_spin.value())
+            self._preview.set_params(wave, depth_midi, center_midi, rate_ticks)
+            lo = _midi_to_ui(max(0,   center_midi - depth_midi))
+            hi = _midi_to_ui(min(127, center_midi + depth_midi))
+            self._range_label.setText(f"Range: {lo} – {hi}")
 
     def _on_use_current(self) -> None:
+        param = PARAMETER_LABELS[self._param_combo.currentText()]
+        if param is Parameter.BPM:
+            if self._get_bpm:
+                self._center_spin.setValue(self._get_bpm())
+            return
         selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
         if not selected:
             return
-        param    = PARAMETER_LABELS[self._param_combo.currentText()]
         midi_val = self._get_value(selected[0], param)
         self._center_spin.setValue(_midi_to_ui(midi_val))
 
     def _on_start(self) -> None:
+        param      = PARAMETER_LABELS[self._param_combo.currentText()]
+        wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
+        rate_ticks = _RATE_TICKS[self._rate_spin.value()]
+
+        if param is Parameter.BPM:
+            if self._bpm_original is None and self._get_bpm:
+                self._bpm_original = self._get_bpm()
+            # Replace any existing BPM LFO (only one makes sense globally)
+            for lfo in [l for l in self._active_lfos if l.parameter is Parameter.BPM]:
+                self._engine.remove_lfo(lfo)
+                self._active_lfos.remove(lfo)
+            lfo = LfoClip(
+                track        = 0,
+                parameter    = Parameter.BPM,
+                wave         = wave,
+                rate_ticks   = rate_ticks,
+                depth        = self._depth_spin.value(),
+                center_value = round(self._center_spin.value()),
+                inverted     = False,
+            )
+            self._engine.add_lfo(lfo)
+            self._active_lfos.append(lfo)
+            self._refresh_list()
+            return
+
         selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
         if not selected:
             return
-        param            = PARAMETER_LABELS[self._param_combo.currentText()]
-        wave             = LFO_WAVE_LABELS[self._wave_combo.currentText()]
-        rate_ticks       = _RATE_TICKS[self._rate_spin.value()]
         depth            = _ui_to_midi(self._depth_spin.value())
         center_value     = _ui_to_midi(self._center_spin.value())
         invert_secondary = self._invert_check.isChecked()
@@ -745,26 +818,42 @@ class LfoPanel(QFrame):
             lfo = self._active_lfos.pop(row)
             self._engine.remove_lfo(lfo)
             self._refresh_list()
+            self._maybe_restore_bpm()
 
     def _on_stop_all(self) -> None:
         self._engine.clear_lfos()
         self._active_lfos.clear()
         self._refresh_list()
+        self._maybe_restore_bpm()
+
+    def _maybe_restore_bpm(self) -> None:
+        if self._bpm_original is not None:
+            if not any(l.parameter is Parameter.BPM for l in self._active_lfos):
+                if self._set_bpm:
+                    self._set_bpm(self._bpm_original)
+                self._bpm_original = None
 
     def _refresh_list(self) -> None:
         self._lfo_list.clear()
         for lfo in self._active_lfos:
-            lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
-            hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
             if lfo.rate_ticks >= PPQN:
                 rate_str = f"{lfo.rate_ticks // PPQN}b/cycle"
             else:
                 rate_str = f"{PPQN // lfo.rate_ticks}×/beat"
-            inv_str = " [inv]" if lfo.inverted else ""
-            self._lfo_list.addItem(QListWidgetItem(
-                f"T{lfo.track}  {lfo.parameter.value.upper()[:3]}  "
-                f"{lfo.wave.value}  {lo}↔{hi}  {rate_str}{inv_str}"
-            ))
+            if lfo.parameter is Parameter.BPM:
+                lo = max(20,  lfo.center_value - lfo.depth)
+                hi = min(300, lfo.center_value + lfo.depth)
+                self._lfo_list.addItem(QListWidgetItem(
+                    f"BPM  {lfo.wave.value}  {lo}↔{hi}BPM  {rate_str}"
+                ))
+            else:
+                lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
+                hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
+                inv_str = " [inv]" if lfo.inverted else ""
+                self._lfo_list.addItem(QListWidgetItem(
+                    f"T{lfo.track}  {lfo.parameter.value.upper()[:3]}  "
+                    f"{lfo.wave.value}  {lo}↔{hi}  {rate_str}{inv_str}"
+                ))
 
     def on_beat(self, beat_count: int) -> None:
         rate_ticks  = _RATE_TICKS[self._rate_spin.value()]
@@ -929,7 +1018,11 @@ class MainWindow(QMainWindow):
         root.addLayout(tracks_row)
 
         # ── LFO panel ──
-        self._lfo_panel = LfoPanel(engine, self._clock, self._get_strip_value)
+        self._lfo_panel = LfoPanel(
+            engine, self._clock, self._get_strip_value,
+            get_bpm_fn=lambda: self._bpm_spin.value(),
+            set_bpm_fn=self._set_bpm_from_lfo,
+        )
         root.addWidget(self._lfo_panel)
 
         # ── Status bar ──
@@ -1078,9 +1171,18 @@ class MainWindow(QMainWindow):
         self._lfo_panel.on_beat(beat_num)
 
     def _on_automation_update(self, track: int, param_name: str, value: int) -> None:
+        if param_name == Parameter.BPM.value:
+            self._set_bpm_from_lfo(float(value))
+            return
         strip = self._strips.get(track)
         if strip:
             strip.set_automation_value(param_name, value)
+
+    def _set_bpm_from_lfo(self, bpm: float) -> None:
+        self._clock_gen.set_bpm(bpm)
+        self._bpm_spin.blockSignals(True)
+        self._bpm_spin.setValue(bpm)
+        self._bpm_spin.blockSignals(False)
 
     def _on_cc_received(self, channel: int, control: int, value: int) -> None:
         strip = self._strips.get(channel + 1)

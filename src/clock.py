@@ -297,9 +297,9 @@ class MidiClockGenerator:
                         self._spp_tick_rem = 0
                         self._spp_pos += 1
                 song_tick = self._spp_pos * 6 + self._spp_tick_rem
-                is_beat = self._playing and song_tick % PPQN == 0
+                is_beat = self._tick_count % PPQN == 0
                 if self._tick_callback:
-                    self._tick_callback(song_tick, song_tick // PPQN)
+                    self._tick_callback(self._tick_count, self._tick_count // PPQN)
                 if is_beat and self._beat_callback:
-                    self._beat_callback(song_tick // PPQN)
+                    self._beat_callback(self._tick_count // PPQN)
             last_tick = next_tick
