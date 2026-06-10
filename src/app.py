@@ -14,7 +14,7 @@ import mido
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from src.midi_connection import connect
+from src.midi_connection import connect, OP1_KEYWORD
 from src.clock import ClockListener, MidiClockGenerator
 from src.controller import Controller
 from src.automation import AutomationEngine, Parameter
@@ -44,7 +44,8 @@ def main() -> None:
         QMessageBox.critical(None, "MIDI Connection Failed", str(exc))
         sys.exit(1)
 
-    port_name = in_port.name
+    in_port_name  = in_port.name
+    out_port_name = out_port.name
 
     controller = Controller(out_port)
     bridge = ClockBridge()
@@ -88,15 +89,68 @@ def main() -> None:
     # Any response will be captured in the startup log for mode detection research.
     out_port.send(mido.Message("sysex", data=[0x7E, 0x7F, 0x06, 0x01]))
 
-    window = MainWindow(controller, clock, engine, bridge, port_name, clock_gen)
+    window = MainWindow(controller, clock, engine, bridge, in_port_name, clock_gen)
     window.move(0, 0)
     window.show()
 
+    # ── Connection polling ──────────────────────────────────────────────────
+    # Poll every 500ms. On disconnect: stop threads immediately before they
+    # touch the dead port (a segfault in rtmidi, not a Python exception).
+    # Do NOT close old ports — Core MIDI cleans them up; closing a dead port
+    # is itself what triggers the crash.
+    _connected = True
+
+    def _check_connection() -> None:
+        nonlocal _connected, in_port, out_port
+        try:
+            in_names  = mido.get_input_names()
+            out_names = mido.get_output_names()
+        except Exception:
+            # rtmidi raises InvalidPortError when the port list is mid-update
+            # (device being removed). Treat as disconnected and retry next tick.
+            in_names  = []
+            out_names = []
+        port_present = in_port_name in in_names and out_port_name in out_names
+
+        if _connected and not port_present:
+            _connected = False
+            # Stop threads NOW, before their next read/write on the dead port.
+            clock_gen.disable_clock()   # stops sending MIDI clock immediately
+            clock.stop()               # stops reading MIDI input
+            bridge.disconnected.emit()
+
+        elif not _connected and port_present:
+            try:
+                new_in  = mido.open_input(in_port_name)
+                new_out = mido.open_output(out_port_name)
+                controller.set_port(new_out)
+                clock_gen.reconnect(new_out)
+                clock.reconnect(new_in)
+                in_port  = new_in
+                out_port = new_out
+                _connected = True
+                bridge.reconnected.emit()
+            except Exception:
+                pass  # try again next tick
+
+    conn_timer = QTimer()
+    conn_timer.timeout.connect(_check_connection)
+    conn_timer.start(500)
+    # ───────────────────────────────────────────────────────────────────────
+
     def on_quit() -> None:
+        conn_timer.stop()
         clock_gen.shutdown()
         clock.stop()
-        in_port.close()
-        out_port.close()
+        if _connected:
+            try:
+                in_port.close()
+            except Exception:
+                pass
+            try:
+                out_port.close()
+            except Exception:
+                pass
 
     app.aboutToQuit.connect(on_quit)
     sys.exit(app.exec())

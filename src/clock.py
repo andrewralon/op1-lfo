@@ -82,6 +82,14 @@ class ClockListener:
         self._stop_event.set()
         self._thread.join(timeout=2.0)
 
+    def reconnect(self, new_port: mido.ports.BaseInput) -> None:
+        self._stop_event.set()
+        self._thread.join(timeout=2.0)
+        self._port = new_port
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="ClockListener")
+        self._thread.start()
+
     @property
     def tick_count(self) -> int:
         with self._lock:
@@ -247,17 +255,17 @@ class MidiClockGenerator:
         """Send Start (0xFA) first time; Continue (0xFB) on subsequent presses."""
         self._playing = True
         if self._has_started:
-            self._port.send(mido.Message("continue"))
+            self._safe_send(mido.Message("continue"))
         else:
             self._spp_pos = 0
             self._spp_tick_rem = 0
-            self._port.send(mido.Message("start"))
+            self._safe_send(mido.Message("start"))
             self._has_started = True
 
     def stop(self) -> None:
         """Send MIDI Stop (0xFC) and freeze the SPP position."""
         self._playing = False
-        self._port.send(mido.Message("stop"))
+        self._safe_send(mido.Message("stop"))
 
     @property
     def is_playing(self) -> bool:
@@ -268,30 +276,44 @@ class MidiClockGenerator:
         self._spp_pos = 0
         self._spp_tick_rem = 0
         self._has_started = False
-        self._port.send(mido.Message("songpos", pos=0))
+        self._safe_send(mido.Message("songpos", pos=0))
 
     def tape_prev_bar(self) -> None:
         """CC 82 + SPP: jump tape and sequencer position back one bar."""
-        self._port.send(mido.Message("control_change", channel=0, control=82, value=127))
+        self._safe_send(mido.Message("control_change", channel=0, control=82, value=127))
         self._spp_pos = max(0, self._spp_pos - 16)
-        self._port.send(mido.Message("songpos", pos=self._spp_pos))
+        self._safe_send(mido.Message("songpos", pos=self._spp_pos))
         if self._playing:
-            self._port.send(mido.Message("continue"))
+            self._safe_send(mido.Message("continue"))
 
     def tape_next_bar(self) -> None:
         """CC 83 + SPP: jump tape and sequencer position forward one bar."""
-        self._port.send(mido.Message("control_change", channel=0, control=83, value=127))
+        self._safe_send(mido.Message("control_change", channel=0, control=83, value=127))
         self._spp_pos += 16
-        self._port.send(mido.Message("songpos", pos=self._spp_pos))
+        self._safe_send(mido.Message("songpos", pos=self._spp_pos))
         if self._playing:
-            self._port.send(mido.Message("continue"))
+            self._safe_send(mido.Message("continue"))
 
     def shutdown(self) -> None:
         self._running = False
 
+    def reconnect(self, new_port: mido.ports.BaseOutput) -> None:
+        self._running = False
+        self._thread.join(timeout=2.0)
+        self._port = new_port
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True, name="ClockGenerator")
+        self._thread.start()
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _safe_send(self, msg: mido.Message) -> None:
+        try:
+            self._port.send(msg)
+        except Exception:
+            pass
 
     def _run(self) -> None:
         last_tick = time.perf_counter()
@@ -304,7 +326,7 @@ class MidiClockGenerator:
             if sleep_time > 0:
                 time.sleep(sleep_time)
             if self._clock_enabled:
-                self._port.send(mido.Message("clock"))
+                self._safe_send(mido.Message("clock"))
                 self._tick_count += 1
                 if self._playing:
                     self._spp_tick_rem += 1

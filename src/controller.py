@@ -31,6 +31,10 @@ class Controller:
         # Internal mute state for each track (False = unmuted)
         self._muted: dict[int, bool] = {t: False for t in VALID_TRACKS}
 
+    def set_port(self, new_port: mido.ports.BaseOutput) -> None:
+        with self._lock:
+            self._port = new_port
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -80,19 +84,19 @@ class Controller:
 
     def play(self) -> None:
         """Send MIDI Start (0xFA) to the OP-1."""
-        self._port.send(mido.Message("start"))
+        self._safe_send(mido.Message("start"))
 
     def stop(self) -> None:
         """Send MIDI Stop (0xFC) to the OP-1."""
-        self._port.send(mido.Message("stop"))
+        self._safe_send(mido.Message("stop"))
 
     def octave_up(self) -> None:
         """Shift octave up via CC 79 ≥ 64 on channel 1."""
-        self._port.send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=127))
+        self._safe_send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=127))
 
     def octave_down(self) -> None:
         """Shift octave down via CC 79 < 64 on channel 1."""
-        self._port.send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=0))
+        self._safe_send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=0))
 
     def sync_mute_state(self, track: int, muted: bool) -> None:
         """Update internal mute tracking without sending CC — used to sync from OP-1."""
@@ -106,8 +110,14 @@ class Controller:
 
     def _send_cc(self, track: int, cc: int, value: int) -> None:
         # mido channels are 0-indexed; track 1 → channel 0
-        msg = mido.Message("control_change", channel=track - 1, control=cc, value=value)
-        self._port.send(msg)
+        self._safe_send(mido.Message("control_change", channel=track - 1, control=cc, value=value))
+
+    def _safe_send(self, msg: mido.Message) -> None:
+        try:
+            with self._lock:
+                self._port.send(msg)
+        except Exception:
+            pass
 
     @staticmethod
     def _validate_track(track: int) -> None:

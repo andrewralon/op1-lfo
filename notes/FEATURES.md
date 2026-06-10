@@ -4,7 +4,6 @@
 - [ ] Show selected LFOs in waveform view: when running, display selected active LFOs in the waveform preview (fall back to all active LFOs if none are selected)
 - [ ] LFO curve colors match tracks: color each LFO automation curve to match its assigned track color(s)
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
-- [ ] Graceful MIDI disconnect: detect OP-1 unplug mid-session, update UI to reflect disconnected state, show reconnect dialog instead of crashing
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 - [ ] Per-track FX + LFO params: add OP-1 MIDI CC params for per-track FX controls and per-track LFO settings (see OP-1 MIDI spec)
 - [ ] Master FX params: add OP-1 MIDI CC params for master FX controls (see OP-1 MIDI spec)
@@ -34,6 +33,7 @@
 - [x] Octave shift: CC 79 (< 64 = down, ≥ 64 = up) — note: only active on OP-1 in keyboard/synth mode, not tape mode
 - [x] LFO panel: waveform preview, rate/depth/center controls, range readout on same row, Start/Stop Selected/Stop All
 - [x] Tempo LFO: BPM exposed as LFO target; LFOs modulate app clock tempo with float precision; BPM restores to original value when Tempo LFO is stopped
+- [x] Graceful MIDI disconnect: detects OP-1 unplug via port-name polling (500ms), stops clock threads immediately to prevent rtmidi segfault, shows red banner; auto-reconnects when device reappears
 - [x] LFO Random curve: sample-and-hold waveform — 8 steps per cycle, each holding a deterministic pseudo-random value
 - [x] MIDI port list starts at 1: manual port selection prompt numbers ports from 1 instead of 0
 - [x] Color palette refactor: variables reorganized into three groups (UI elements, OP-1 track colors, extras) with semantic names (`_BLUE_1`, `_OCHRE_2`, `_GRAY_3`, `_ORANGE_4`, `_FADER`, `_GROOVE`, `_KNOB_RIM`, etc.)

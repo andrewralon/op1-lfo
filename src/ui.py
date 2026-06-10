@@ -141,6 +141,8 @@ class ClockBridge(QObject):
     beat              = pyqtSignal(int)
     automation_update = pyqtSignal(int, str, float)
     cc_received       = pyqtSignal(int, int, int)
+    disconnected      = pyqtSignal()
+    reconnected       = pyqtSignal()
 
 
 # ---------------------------------------------------------------------------
@@ -897,6 +899,8 @@ class MainWindow(QMainWindow):
         bridge.beat.connect(self._on_beat)
         bridge.automation_update.connect(self._on_automation_update)
         bridge.cc_received.connect(self._on_cc_received)
+        bridge.disconnected.connect(self._on_disconnected)
+        bridge.reconnected.connect(self._on_reconnected)
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, port_name: str, clock_gen) -> None:
         self.setWindowTitle("OP-1 LFO Hero")
@@ -1040,9 +1044,10 @@ class MainWindow(QMainWindow):
         status_row = QHBoxLayout()
         status_row.setContentsMargins(2, 4, 2, 0)
 
-        status = QLabel(f"● Connected: {port_name}")
-        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
-        status_row.addWidget(status)
+        self._conn_label = QLabel(f"● Connected: {port_name}")
+        self._conn_label.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
+        self._conn_port_name = port_name
+        status_row.addWidget(self._conn_label)
 
         status_row.addStretch()
 
@@ -1191,6 +1196,14 @@ class MainWindow(QMainWindow):
         elif self._transport_stopped:
             self._transport_stopped = False
             self._clock_gen.goto_start()
+
+    def _on_disconnected(self) -> None:
+        self._conn_label.setText(f"● Disconnected: {self._conn_port_name} — Reconnecting...")
+        self._conn_label.setStyleSheet(f"color: {_RED}; font-size: 11pt; font-weight: bold;")
+
+    def _on_reconnected(self) -> None:
+        self._conn_label.setText(f"● Connected: {self._conn_port_name}")
+        self._conn_label.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
 
     def _on_beat(self, beat_num: int) -> None:
         self._lfo_panel.on_beat(beat_num)
