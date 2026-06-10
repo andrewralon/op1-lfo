@@ -49,9 +49,9 @@ def main() -> None:
     controller = Controller(out_port)
     bridge = ClockBridge()
 
-    def on_automation_update(track: int, param: Parameter, value: int) -> None:
+    def on_automation_update(track: int, param: Parameter, value: int | float) -> None:
         # Runs on the clock daemon thread — only emit signals here.
-        bridge.automation_update.emit(track, param.value, value)
+        bridge.automation_update.emit(track, param.value, float(value))
 
     engine = AutomationEngine(controller, update_callback=on_automation_update)
 

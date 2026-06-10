@@ -16,9 +16,12 @@ runs on the clock daemon thread at ~29 Hz (24 PPQN × BPM / 60).  All public
 methods acquire a lock and are safe to call from the Qt main thread.
 """
 
+import logging
 import math
 import random
 import threading
+
+log = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Callable
@@ -143,13 +146,13 @@ class LfoClip:
     parameter: Parameter
     wave: LfoWave
     rate_ticks: int     # ticks per full cycle (PPQN-based)
-    depth: int          # oscillation half-amplitude in MIDI units
-    center_value: int   # MIDI center (0–127)
+    depth: int | float          # oscillation half-amplitude (MIDI units or BPM for Tempo)
+    center_value: int | float   # MIDI center (0–127) or BPM for Tempo
     inverted: bool = False
     _random_prev_phase: float = field(default=-1.0, init=False, repr=False)
     _random_value: float = field(default=0.0, init=False, repr=False)
 
-    def value_at(self, phase: float) -> int:
+    def value_at(self, phase: float) -> int | float:
         """phase: 0.0–1.0 position within one cycle."""
         if self.wave is LfoWave.RANDOM:
             p = phase % 1.0
@@ -161,10 +164,9 @@ class LfoClip:
             y = lfo_wave_value(phase, self.wave)
         if self.inverted:
             y = -y
-        raw = round(self.center_value + y * self.depth)
         if self.parameter is Parameter.TEMPO:
-            return max(20, min(300, raw))
-        return max(0, min(127, raw))
+            return max(20.0, min(300.0, self.center_value + y * self.depth))
+        return max(0, min(127, round(self.center_value + y * self.depth)))
 
 
 # Fired from the clock thread; used to update UI sliders
@@ -333,12 +335,15 @@ class AutomationEngine:
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
 
-    def _send_lfo_if_changed(self, lfo: LfoClip, value: int) -> None:
+    def _send_lfo_if_changed(self, lfo: LfoClip, value: int | float) -> None:
         lfo_id = id(lfo)
         with self._lock:
             if self._lfo_last_sent.get(lfo_id) == value:
                 return
             self._lfo_last_sent[lfo_id] = value
+
+        if lfo.parameter is Parameter.TEMPO:
+            log.debug("Tempo LFO → %s (type %s)", value, type(value).__name__)
 
         if lfo.parameter is Parameter.VOLUME:
             self._ctrl.set_volume(lfo.track, value)

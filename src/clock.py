@@ -259,6 +259,17 @@ class MidiClockGenerator:
         self._playing = False
         self._port.send(mido.Message("stop"))
 
+    @property
+    def is_playing(self) -> bool:
+        return self._playing
+
+    def goto_start(self) -> None:
+        """Send SPP 0 to jump the tape to the beginning."""
+        self._spp_pos = 0
+        self._spp_tick_rem = 0
+        self._has_started = False
+        self._port.send(mido.Message("songpos", pos=0))
+
     def tape_prev_bar(self) -> None:
         """CC 82 + SPP: jump tape and sequencer position back one bar."""
         self._port.send(mido.Message("control_change", channel=0, control=82, value=127))

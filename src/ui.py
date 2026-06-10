@@ -2,6 +2,8 @@
 
 import logging
 import math
+
+log = logging.getLogger(__name__)
 import os
 import time
 from enum import Enum, auto
@@ -791,7 +793,7 @@ class LfoPanel(QFrame):
                 wave         = wave,
                 rate_ticks   = rate_ticks,
                 depth        = self._depth_spin.value(),
-                center_value = round(self._center_spin.value()),
+                center_value = self._center_spin.value(),
                 inverted     = False,
             )
             self._engine.add_lfo(lfo)
@@ -884,9 +886,10 @@ class MainWindow(QMainWindow):
         clock_gen,
     ) -> None:
         super().__init__()
-        self._controller = controller
-        self._clock      = clock
-        self._clock_gen  = clock_gen
+        self._controller        = controller
+        self._clock             = clock
+        self._clock_gen         = clock_gen
+        self._transport_playing = False
         self._strips: dict[int, TrackStrip] = {}
         self._setup_ui(controller, engine, port_name, clock_gen)
 
@@ -926,6 +929,7 @@ class MainWindow(QMainWindow):
 
         play_btn.clicked.connect(clock_gen.play)
         stop_btn.clicked.connect(clock_gen.stop)
+        stop_btn.clicked.connect(self._on_transport_stop)
         oct_left_btn.clicked.connect(clock_gen.tape_prev_bar)
         oct_right_btn.clicked.connect(clock_gen.tape_next_bar)
 
@@ -1174,16 +1178,31 @@ class MainWindow(QMainWindow):
     # Slots
     # ------------------------------------------------------------------
 
+    def _on_transport_play(self) -> None:
+        self._transport_playing = True
+        self._transport_stopped = False
+        self._clock_gen.play()
+
+    def _on_transport_stop(self) -> None:
+        if self._transport_playing:
+            self._transport_playing = False
+            self._transport_stopped = True
+            self._clock_gen.stop()
+        elif self._transport_stopped:
+            self._transport_stopped = False
+            self._clock_gen.goto_start()
+
     def _on_beat(self, beat_num: int) -> None:
         self._lfo_panel.on_beat(beat_num)
 
-    def _on_automation_update(self, track: int, param_name: str, value: int) -> None:
+    def _on_automation_update(self, track: int, param_name: str, value: float) -> None:
+        log.debug("_on_automation_update: param=%s value=%s (type %s)", param_name, value, type(value).__name__)
         if param_name == Parameter.TEMPO.value:
-            self._set_bpm_from_lfo(float(value))
+            self._set_bpm_from_lfo(value)
             return
         strip = self._strips.get(track)
         if strip:
-            strip.set_automation_value(param_name, value)
+            strip.set_automation_value(param_name, int(value))
 
     def _set_bpm_from_lfo(self, bpm: float) -> None:
         self._clock_gen.set_bpm(bpm)
