@@ -75,7 +75,7 @@ _WAVE_SVG       = _ASSETS + "wave.svg"
 
 # OTHER - UI CONSTRAINTS
 _LABEL_GAP  = 12  # px between a label and its paired control (dropdown, spinbox, etc.)
-_ICON_PT    = 22  # pt size for unicode icon labels
+_ICON_PT    = 26  # pt size for unicode icon labels
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +116,33 @@ _RATE_TICKS: dict[int, int] = {
     8: PPQN // 8,   # 8× per beat
 }
 
+
+
+class CycleCombo(QComboBox):
+    """QComboBox whose Up/Down keys wrap, and whose width never changes with the selection."""
+
+    def sizeHint(self):
+        base = super().sizeHint()
+        if self.count() == 0:
+            return base
+        fm = self.fontMetrics()
+        # overhead = arrow button + padding (constant regardless of item)
+        overhead = base.width() - fm.horizontalAdvance(self.currentText())
+        max_w = max(fm.horizontalAdvance(self.itemText(i)) for i in range(self.count()))
+        base.setWidth(overhead + max_w)
+        return base
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == Qt.Key.Key_Up:
+            self.setCurrentIndex((self.currentIndex() - 1) % self.count())
+        elif key == Qt.Key.Key_Down:
+            self.setCurrentIndex((self.currentIndex() + 1) % self.count())
+        else:
+            super().keyPressEvent(event)
 
 
 class SvgIcon(QWidget):
@@ -286,6 +313,101 @@ class SegmentDigit(QWidget):
         hseg(ym,  segs[6])
 
         p.end()
+
+
+# ---------------------------------------------------------------------------
+# Volume fader slider
+# ---------------------------------------------------------------------------
+
+class VolumeSlider(QSlider):
+    """Vertical volume fader with a chamfered LED-bar-segment handle."""
+
+    _H  = 12   # handle height px
+    _W  = 23   # handle width px
+    _GW = 4    # groove width px
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Orientation.Vertical, parent)
+        self._dragging = False
+
+    def _val_to_cy(self, val: int) -> int:
+        """Center-y of handle for a given value (max at top)."""
+        lo, hi = self.minimum(), self.maximum()
+        pad    = self._H // 2
+        travel = max(1, self.height() - 2 * pad)
+        frac   = (val - lo) / (hi - lo) if hi != lo else 0.0
+        return pad + int((1.0 - frac) * travel)
+
+    def _y_to_val(self, y: int) -> int:
+        lo, hi = self.minimum(), self.maximum()
+        pad    = self._H // 2
+        travel = max(1, self.height() - 2 * pad)
+        frac   = 1.0 - (y - pad) / travel
+        return lo + round(max(0.0, min(1.0, frac)) * (hi - lo))
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+
+        w   = self.width()
+        h   = self.height()
+        hh  = self._H
+        gw  = self._GW
+        pad = hh // 2
+        cy  = self._val_to_cy(self.value())
+        gx  = (w - gw) // 2
+
+        # Active groove: bottom to handle (filled level)
+        if cy < h - pad:
+            p.setBrush(QColor(_RED))
+            p.drawRoundedRect(gx, cy, gw, h - pad - cy, 2, 2)
+
+        # Inactive groove: handle to top
+        if cy > pad:
+            p.setBrush(QColor(_GROOVE))
+            p.drawRoundedRect(gx, pad, gw, cy - pad, 2, 2)
+
+        # Diamond handle: wide 4-point rhombus
+        mx = float(w // 2)
+        fy = float(cy)
+        poly = QPolygonF([
+            QPointF(mx,       fy - hh / 2.0),  # top
+            QPointF(float(w), fy),               # right
+            QPointF(mx,       fy + hh / 2.0),  # bottom
+            QPointF(0.0,      fy),               # left
+        ])
+        p.setPen(QPen(QColor(_BLACK), 2.0))
+        p.setBrush(QColor(_DIM))
+        p.drawPolygon(poly)
+        p.end()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self.setValue(self._y_to_val(int(event.position().y())))
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._dragging:
+            self.setValue(self._y_to_val(int(event.position().y())))
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event) -> None:
+        delta = 1 if event.angleDelta().y() > 0 else -1
+        self.setValue(self.value() + delta)
+        event.accept()
 
 
 # ---------------------------------------------------------------------------
@@ -471,30 +593,14 @@ class TrackStrip(QFrame):
         self._vol_d2.setStyleSheet(f"color: {_TEXT};")
         self._vol_d2.setFixedWidth(34)
 
-        self._vol_slider = QSlider(Qt.Orientation.Vertical)
+        self._vol_slider = VolumeSlider()
         self._vol_slider.setRange(0, 127)
         self._vol_slider.setValue(115)
         self._vol_slider.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding
         )
         self._vol_slider.setMinimumHeight(110)
-        self._vol_slider.setFixedWidth(20)
-        self._vol_slider.setStyleSheet(
-            "QSlider::groove:vertical {"
-            f"  width: 4px; background-color: {_GROOVE}; border-radius: 2px;"
-            "}"
-            "QSlider::sub-page:vertical {"
-            f"  background-color: {_GRAY}; border-radius: 2px; width: 4px;"
-            "}"
-            "QSlider::add-page:vertical {"
-            f"  background-color: {_RED}; border-radius: 2px; width: 4px;"
-            "}"
-            "QSlider::handle:vertical {"
-            f"  background-color: {_FADER}; border: none;"
-            "  width: 20px; height: 10px;"
-            "  margin: 0 -8px; border-radius: 3px;"
-            "}"
-        )
+        self._vol_slider.setFixedWidth(23)
         self._vol_slider.valueChanged.connect(self._on_volume_changed)
 
         fader_row.addStretch()
@@ -608,7 +714,7 @@ class TrackBtn(QPushButton):
         self._state = initial_state
         self.setFlat(True)
         f = QFont()
-        f.setPointSize(14)
+        f.setPointSize(16)
         f.setBold(True)
         self.setFont(f)
         self.clicked.connect(self._cycle)
@@ -689,7 +795,7 @@ class LfoPanel(QFrame):
         self._track_btns: dict[int, TrackBtn] = {}
         for t in (1, 2, 3, 4):
             btn = TrackBtn(str(t), t, initial_state=1 if t == 1 else 0)
-            btn.setFixedSize(28, 28)
+            btn.setFixedSize(36, 36)
             self._track_btns[t] = btn
             hdr.addWidget(btn)
             if t < 4:
@@ -718,6 +824,7 @@ class LfoPanel(QFrame):
         self._range_label = QLabel()
         self._range_label.setStyleSheet(f"color: {_DIM}; font-size: 12pt;")
         self._range_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._range_label.setFixedWidth(110)
 
         # ── Row 3: Rate / Depth / Center ──
         params_row = QHBoxLayout()
@@ -726,7 +833,7 @@ class LfoPanel(QFrame):
         _spin_style = (
             f"QSpinBox {{ color: {_TEXT}; background-color: {_BG};"
             f"  border: 1px solid {_DIM}; border-radius: 4px;"
-            f"  font-size: 13pt; padding: 2px 4px; }}"
+            f"  font-size: 15pt; padding: 2px 4px; }}"
             f"QSpinBox::up-button {{ subcontrol-origin: border; subcontrol-position: top right;"
             f"  width: 16px; background-color: {_BG}; border-left: 1px solid {_DIM};"
             f"  border-bottom: 1px solid {_DIM}; }}"
@@ -746,12 +853,14 @@ class LfoPanel(QFrame):
 
         self._rate_spin.valueChanged.connect(lambda _: self._update_preview())
 
-        self._depth_spin = QSpinBox()
-        self._depth_spin.setRange(0, 49)
-        self._depth_spin.setValue(25)
-        self._depth_spin.setFixedWidth(66)
+        self._depth_spin = QDoubleSpinBox()
+        self._depth_spin.setDecimals(1)
+        self._depth_spin.setSingleStep(0.1)
+        self._depth_spin.setRange(0.0, 49.0)
+        self._depth_spin.setValue(25.0)
+        self._depth_spin.setFixedWidth(78)
         self._depth_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._depth_spin.setStyleSheet(_spin_style)
+        self._depth_spin.setStyleSheet(_double_spin_style)
 
         self._center_spin = QDoubleSpinBox()
         self._center_spin.setDecimals(1)
@@ -851,11 +960,12 @@ class LfoPanel(QFrame):
 
     # ------------------------------------------------------------------
 
-    def _make_combo(self, items: list[str]) -> QComboBox:
-        box = QComboBox()
+    def _make_combo(self, items: list[str]) -> CycleCombo:
+        box = CycleCombo()
+        box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         box.addItems(items)
         box.setStyleSheet(
-            f"QComboBox {{ font-size: 13pt; color: {_TEXT}; background-color: {_BG};"
+            f"QComboBox {{ font-size: 15pt; color: {_TEXT}; background-color: {_BG};"
             f"  border: 1px solid {_DIM}; border-radius: 4px; padding: 2px 4px; }}"
             f"QComboBox QAbstractItemView {{ color: {_TEXT}; background-color: {_BG};"
             f"  selection-background-color: {_ACCENT}; selection-color: #000; }}"
@@ -877,16 +987,16 @@ class LfoPanel(QFrame):
         self._depth_spin.blockSignals(True)
         self._center_spin.blockSignals(True)
         if is_tempo:
-            self._depth_spin.setRange(0, 140)
+            self._depth_spin.setRange(0.0, 140.0)
             self._center_spin.setRange(20.0, 300.0)
             current_bpm = self._get_bpm() if self._get_bpm else 100.0
             self._center_spin.setValue(current_bpm)
-            self._depth_spin.setValue(10)
+            self._depth_spin.setValue(10.0)
         else:
-            self._depth_spin.setRange(0, 49)
+            self._depth_spin.setRange(0.0, 49.0)
             self._center_spin.setRange(0.0, 99.0)
             self._center_spin.setValue(50.0)
-            self._depth_spin.setValue(25)
+            self._depth_spin.setValue(25.0)
         self._depth_spin.blockSignals(False)
         self._center_spin.blockSignals(False)
         self._update_preview()
@@ -1155,7 +1265,7 @@ class MainWindow(QMainWindow):
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 3px; font-size: 11pt; padding: 0px; }}"
             f"QPushButton:hover {{ background-color: {_HOVER}; }}"
-            f"QPushButton:disabled {{ color: {_HOVER}; background-color: {_PANEL}; }}"
+            f"QPushButton:disabled {{ color: {_GRAY}; background-color: {_MUTE_OFF}; }}"
         )
         self._bpm_up_btn = QPushButton("▲")
         self._bpm_up_btn.setFixedSize(22, 22)

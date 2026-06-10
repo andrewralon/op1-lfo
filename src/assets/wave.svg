@@ -1,8 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16">
-  <!-- Ocean wave: two rolling humps with a crest curl on the right -->
-  <path d="M0,10 C3,4 6,4 9,10 C12,16 15,16 18,10 C19.5,7 21,5 22,4 C22.5,3.5 23,4 22,5 C21,6 20.5,8 21,10"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 20">
+  <!-- Wave: rises left, rolls clockwise into narrow crest tip, curls back left -->
+  <path d="M 1,17 C 5,17 8,14 11,11 C 13,8 17,4 20,3 C 22,1 24,2 25,6 C 25,9 21,10 19,9 C 17,11 17,15 19,17 L 27,17"
         fill="none" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Spray/foam dots at crest -->
-  <circle cx="23" cy="3.5" r="0.8" fill="#aaaaaa"/>
-  <circle cx="21.5" cy="2.5" r="0.6" fill="#aaaaaa"/>
+  <!-- Inner barrel arc -->
+  <path d="M 24,7 C 23,10 21,11 20,12"
+        fill="none" stroke="#aaaaaa" stroke-width="1" stroke-linecap="round"/>
+  <!-- Foam dots at crest tip -->
+  <circle cx="23" cy="1.5" r="0.8" fill="#aaaaaa"/>
+  <circle cx="25" cy="3" r="0.7" fill="#aaaaaa"/>
+  <circle cx="26" cy="5" r="0.6" fill="#aaaaaa"/>
 </svg>
