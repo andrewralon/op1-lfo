@@ -109,6 +109,13 @@ class LfoWave(Enum):
 
 LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
 
+# Multiply rate_ticks by this factor before computing phase for a given wave.
+# Add an entry here to make a waveform span more beats per cycle.
+LFO_RATE_MULTIPLIERS: dict[LfoWave, int] = {
+    LfoWave.SWEEP_UP:   1,
+    LfoWave.SWEEP_DOWN: 1,
+}
+
 
 def lfo_wave_value(phase: float, wave: LfoWave) -> float:
     """Return oscillation in [-1.0, 1.0] for phase in [0.0, 1.0]."""
@@ -343,10 +350,8 @@ class AutomationEngine:
         if self._update_cb:
             self._update_cb(clip.track, clip.parameter, value)
 
-    _SWEEP_WAVES = frozenset({LfoWave.SWEEP_UP, LfoWave.SWEEP_DOWN})
-
     def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> None:
-        rate = lfo.rate_ticks * 4 if lfo.wave in self._SWEEP_WAVES else lfo.rate_ticks
+        rate = lfo.rate_ticks * LFO_RATE_MULTIPLIERS.get(lfo.wave, 1)
         phase = (tick_count % rate) / rate
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
