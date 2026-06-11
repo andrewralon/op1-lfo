@@ -14,6 +14,17 @@ import mido
 OP1_KEYWORD = "op-1"  # matched case-insensitively against port names
 
 
+def is_ble_port(name: str) -> bool:
+    """Return True if the port name suggests BLE-MIDI rather than USB.
+
+    On macOS/CoreMIDI, USB MIDI endpoints are named 'Device MIDI N'; BLE-MIDI
+    devices appear with just their Bluetooth advertisement name (no 'MIDI' suffix).
+    This heuristic is accurate on macOS; port naming differs on Linux and Windows.
+    """
+    low = name.lower()
+    return OP1_KEYWORD in low and "midi" not in low
+
+
 def list_ports() -> tuple[list[str], list[str]]:
     """Return (input_ports, output_ports)."""
     return mido.get_input_names(), mido.get_output_names()

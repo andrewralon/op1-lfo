@@ -34,6 +34,7 @@ class ClockListener:
         tick_callback: Callable[[int, int], None] | None = None,
         cc_callback: Callable[[int, int, int], None] | None = None,
         startup_log_seconds: float = 5.0,
+        smooth_n: int = SMOOTH_N,
     ) -> None:
         """
         Args:
@@ -59,8 +60,8 @@ class ClockListener:
         self._beat_count: int = 0          # total beats (tick_count // PPQN)
         self._bpm: float | None = None     # None until enough ticks accumulated
 
-        # Ring buffer of the last SMOOTH_N tick-to-tick intervals (seconds)
-        self._intervals: deque[float] = deque(maxlen=SMOOTH_N)
+        # Ring buffer of the last smooth_n tick-to-tick intervals (seconds)
+        self._intervals: deque[float] = deque(maxlen=smooth_n)
         self._last_tick_time: float | None = None
 
         # Startup message log: records (elapsed_s, msg_repr) for all raw messages

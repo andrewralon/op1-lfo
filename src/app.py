@@ -14,8 +14,8 @@ import mido
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from src.midi_connection import connect, OP1_KEYWORD
-from src.clock import ClockListener, MidiClockGenerator
+from src.midi_connection import connect, OP1_KEYWORD, is_ble_port
+from src.clock import ClockListener, MidiClockGenerator, SMOOTH_N
 from src.controller import Controller
 from src.automation import AutomationEngine, Parameter
 from src.ui import MainWindow, ClockBridge, apply_dark_theme
@@ -74,6 +74,8 @@ def main() -> None:
             QMessageBox.critical(None, "MIDI Connection Failed", str(exc))
             sys.exit(1)
 
+    ble_mode = is_ble_port(in_port_name) or is_ble_port(out_port_name)
+
     controller = Controller(out_port)
     bridge = ClockBridge()
 
@@ -109,6 +111,7 @@ def main() -> None:
         beat_callback=on_beat,
         tick_callback=on_slave_tick,
         cc_callback=on_cc,
+        smooth_n=SMOOTH_N * 2 if ble_mode else SMOOTH_N,
     )
     clock.start()
 
@@ -120,7 +123,7 @@ def main() -> None:
         # Any response will be captured in the startup log for mode detection research.
         out_port.send(mido.Message("sysex", data=[0x7E, 0x7F, 0x06, 0x01]))
 
-    window = MainWindow(controller, clock, engine, bridge, in_port_name, clock_gen, out_port_name=out_port_name)
+    window = MainWindow(controller, clock, engine, bridge, in_port_name, clock_gen, out_port_name=out_port_name, ble=ble_mode)
     window.move(0, 0)
     window.show()
 

@@ -1200,11 +1200,13 @@ class MainWindow(QMainWindow):
         in_port_name: str,
         clock_gen,
         out_port_name: str = "",
+        ble: bool = False,
     ) -> None:
         super().__init__()
         self._controller        = controller
         self._clock             = clock
         self._clock_gen         = clock_gen
+        self._ble               = ble
         self._transport_playing = False
         self._transport_stopped = False
         self._strips: dict[int, TrackStrip] = {}
@@ -1219,16 +1221,17 @@ class MainWindow(QMainWindow):
     _NO_DEVICE = "no device"
 
     @staticmethod
-    def _conn_text(in_name: str, out_name: str) -> str:
+    def _conn_text(in_name: str, out_name: str, ble: bool = False) -> str:
         nd = MainWindow._NO_DEVICE
         if in_name == nd and out_name == nd:
             return "● connected: no device"
+        suffix = " (bt)" if ble else ""
         if in_name == out_name:
-            return f"● connected: {in_name}"
-        return f"● connected: [in]{in_name}, [out]{out_name}"
+            return f"● connected: {in_name}{suffix}"
+        return f"● connected: [in]{in_name}, [out]{out_name}{suffix}"
 
     @staticmethod
-    def _conn_color(in_name: str, out_name: str) -> str:
+    def _conn_color(in_name: str, out_name: str, ble: bool = False) -> str:
         nd = MainWindow._NO_DEVICE
         if in_name == nd or out_name == nd:
             return _GOLD
@@ -1380,9 +1383,11 @@ class MainWindow(QMainWindow):
         status_row = QHBoxLayout()
         status_row.setContentsMargins(2, 4, 2, 0)
 
-        self._conn_label = QLabel(self._conn_text(in_port_name, out_port_name))
-        color = self._conn_color(in_port_name, out_port_name)
+        self._conn_label = QLabel(self._conn_text(in_port_name, out_port_name, self._ble))
+        color = self._conn_color(in_port_name, out_port_name, self._ble)
         self._conn_label.setStyleSheet(f"color: {color}; font-size: 11pt; font-weight: bold;")
+        if self._ble:
+            self._conn_label.setToolTip("Bluetooth LE MIDI — expect ~15ms additional latency vs USB")
         self._conn_in_port_name  = in_port_name
         self._conn_out_port_name = out_port_name
         status_row.addWidget(self._conn_label)
@@ -1536,13 +1541,13 @@ class MainWindow(QMainWindow):
             self._clock_gen.goto_start()
 
     def _on_disconnected(self) -> None:
-        base = self._conn_text(self._conn_in_port_name, self._conn_out_port_name)
+        base = self._conn_text(self._conn_in_port_name, self._conn_out_port_name, self._ble)
         self._conn_label.setText(base.replace("● connected", "● disconnected"))
         self._conn_label.setStyleSheet(f"color: {_RED}; font-size: 11pt; font-weight: bold;")
 
     def _on_reconnected(self) -> None:
-        self._conn_label.setText(self._conn_text(self._conn_in_port_name, self._conn_out_port_name))
-        color = self._conn_color(self._conn_in_port_name, self._conn_out_port_name)
+        self._conn_label.setText(self._conn_text(self._conn_in_port_name, self._conn_out_port_name, self._ble))
+        color = self._conn_color(self._conn_in_port_name, self._conn_out_port_name, self._ble)
         self._conn_label.setStyleSheet(f"color: {color}; font-size: 11pt; font-weight: bold;")
 
     def _on_beat(self, beat_num: int) -> None:
