@@ -1,7 +1,6 @@
 # Features
 
 ## To do
-- [ ] Sweep curves: add `sweep up` and `sweep down` LFO waveforms — a chirp/frequency-sweep shape where the oscillation rate accelerates (or decelerates) across the cycle. Naturally one-shot; a sweep-up starts at the minimum rate and reaches the maximum rate by the end of one cycle.
 - [ ] One-shot LFOs: add a `loop` flag to `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI needs a "start once" or "1-shot" trigger or a 1x toggle alongside Start. Sweep curves should default to one-shot. The active LFOs list would show them disappearing automatically on completion.
 - [ ] Master LFO support (tempo, volume, compression, etc.): add an **M** track button (same 3-state style as the 1-4 buttons, colored `_ACCENT` / green) for targeting master/global parameters. Selecting M with a master-capable param (e.g. Tempo) routes the LFO to that master target; clicking M a second time inverts the curve, just like the per-track invert already works. Generalizes to future master params (master volume, master compression) without further UI changes.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
@@ -42,5 +41,6 @@
 - [x] LFO curve colors match tracks: waveform preview draws in each selected track's color; multiple non-inverted tracks alternate colors in 16px segments; inverted tracks draw a second mirrored curve in their own colors; Tempo LFO uses accent green
 - [x] Active LFO waveform view: selecting rows in the active LFOs list shows each selected LFO as its own curve (correct wave shape, rate, track color); deselects on click-away within app; persists when app goes to background; click selected row again to deselect
 - [x] Exp LFO curve: exponential shape — slow start, fast arrival; the exact complement of `log` (which is fast start, slow arrival). Each half-cycle uses `(10^t − 1) / 9` to mirror the `log1p` mapping.
+- [x] Sweep LFO curves: `sweep up` and `sweep down` chirp waveforms — oscillation frequency increases (or decreases) linearly across the cycle. 4 complete oscillations per sweep; `sweep up` uses `sin(2π·4·t²)` and `sweep down` uses `sin(2π·4·(2t−t²))` so instantaneous frequency sweeps from 0→max or max→0.
 - [x] No-device mode: run the app without a MIDI device — `--no-device` flag, auto-activates when no MIDI ports are found, `[0] no device` option during manual port selection; status bar shows **● no device** in gold; mixed real+no-device connections show both port names
 - [x] Bluetooth MIDI: auto-detects BLE-MIDI ports alongside USB (same `op-1` keyword matches both); BLE detected when port name lacks the 'MIDI N' suffix (macOS/CoreMIDI heuristic); status bar appends **(bt)** with tooltip; BPM smoothing doubles (48 ticks) to absorb BLE jitter

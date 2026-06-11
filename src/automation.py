@@ -96,13 +96,15 @@ class Clip:
 
 
 class LfoWave(Enum):
-    SINE     = "sine"
-    TRIANGLE = "triangle"
-    SAW      = "saw"
-    SQUARE   = "square"
-    LOG      = "log"
-    EXP      = "exp"
-    RANDOM   = "random"
+    SINE      = "sine"
+    TRIANGLE  = "triangle"
+    SAW       = "saw"
+    SQUARE    = "square"
+    LOG       = "log"
+    EXP       = "exp"
+    SWEEP_UP  = "sweep up"
+    SWEEP_DOWN = "sweep down"
+    RANDOM    = "random"
 
 
 LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
@@ -136,6 +138,12 @@ def lfo_wave_value(phase: float, wave: LfoWave) -> float:
             return 2.0 * (10.0 ** t - 1.0) / 9.0 - 1.0
         t = (phase - 0.5) * 2.0
         return 1.0 - 2.0 * (10.0 ** t - 1.0) / 9.0
+    if wave is LfoWave.SWEEP_UP:
+        # Chirp: frequency increases linearly 0→max; 4 cycles total; phase² integrates linear freq
+        return math.sin(2.0 * math.pi * 8.0 * phase * phase)
+    if wave is LfoWave.SWEEP_DOWN:
+        # Chirp: frequency decreases linearly max→0; integral of (1-t) gives (2t - t²)
+        return math.sin(2.0 * math.pi * 8.0 * (2.0 * phase - phase * phase))
     if wave is LfoWave.RANDOM:
         # 8 steps per cycle; Knuth multiplicative hash for uniform distribution
         step = int(phase * 8) % 8
@@ -335,8 +343,11 @@ class AutomationEngine:
         if self._update_cb:
             self._update_cb(clip.track, clip.parameter, value)
 
+    _SWEEP_WAVES = frozenset({LfoWave.SWEEP_UP, LfoWave.SWEEP_DOWN})
+
     def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> None:
-        phase = (tick_count % lfo.rate_ticks) / lfo.rate_ticks
+        rate = lfo.rate_ticks * 4 if lfo.wave in self._SWEEP_WAVES else lfo.rate_ticks
+        phase = (tick_count % rate) / rate
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
 
