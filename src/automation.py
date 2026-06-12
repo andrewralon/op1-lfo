@@ -364,10 +364,16 @@ class AutomationEngine:
                 self._ctrl.unmute(clip.track)
         elif clip.parameter in (Parameter.FX_1, Parameter.FX_2, Parameter.FX_3, Parameter.FX_4):
             n = int(clip.parameter.value.split()[1])
-            self._ctrl.set_fx(clip.track, n, value)
+            if clip.track == 0:
+                self._ctrl.set_master_fx(n, value)
+            else:
+                self._ctrl.set_fx(clip.track, n, value)
         elif clip.parameter in (Parameter.LFO_1, Parameter.LFO_2, Parameter.LFO_3, Parameter.LFO_4):
             n = int(clip.parameter.value.split()[1])
-            self._ctrl.set_patch_lfo(clip.track, n, value)
+            if clip.track == 0:
+                self._ctrl.set_master_compressor(n, value)
+            else:
+                self._ctrl.set_patch_lfo(clip.track, n, value)
 
         if self._update_cb:
             self._update_cb(clip.track, clip.parameter, value)
@@ -399,10 +405,16 @@ class AutomationEngine:
                 self._ctrl.unmute(lfo.track)
         elif lfo.parameter in (Parameter.FX_1, Parameter.FX_2, Parameter.FX_3, Parameter.FX_4):
             n = int(lfo.parameter.value.split()[1])
-            self._ctrl.set_fx(lfo.track, n, value)
+            if lfo.track == 0:
+                self._ctrl.set_master_fx(n, value)
+            else:
+                self._ctrl.set_fx(lfo.track, n, value)
         elif lfo.parameter in (Parameter.LFO_1, Parameter.LFO_2, Parameter.LFO_3, Parameter.LFO_4):
             n = int(lfo.parameter.value.split()[1])
-            self._ctrl.set_patch_lfo(lfo.track, n, value)
+            if lfo.track == 0:
+                self._ctrl.set_master_compressor(n, value)
+            else:
+                self._ctrl.set_patch_lfo(lfo.track, n, value)
 
         if self._update_cb:
             self._update_cb(lfo.track, lfo.parameter, value)

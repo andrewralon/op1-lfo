@@ -104,6 +104,16 @@ def _ui_to_midi(v: int) -> int:
     return (v * 127 + 98) // 99  # ceiling: guarantees _midi_to_ui(_ui_to_midi(v)) == v
 
 
+# Params where M is the only valid target (track 1-4 always disabled)
+_MASTER_ONLY_PARAMS: frozenset[Parameter] = frozenset({Parameter.TEMPO})
+
+# Params where M button is available (includes master-only + FX/LFO which can go either way)
+_MASTER_PARAMS: frozenset[Parameter] = frozenset({
+    Parameter.TEMPO,
+    Parameter.FX_1, Parameter.FX_2, Parameter.FX_3, Parameter.FX_4,
+    Parameter.LFO_1, Parameter.LFO_2, Parameter.LFO_3, Parameter.LFO_4,
+})
+
 # Rate 1 (slowest) → 8 (fastest): ticks per LFO cycle
 _RATE_TICKS: dict[int, int] = {
     1: 16 * PPQN,   # once per 16 beats
@@ -126,9 +136,9 @@ class CycleCombo(QComboBox):
         if self.count() == 0:
             return base
         fm = self.fontMetrics()
-        # overhead = arrow button + padding (constant regardless of item)
-        overhead = base.width() - fm.horizontalAdvance(self.currentText())
         max_w = max(fm.horizontalAdvance(self.itemText(i)) for i in range(self.count()))
+        # base.width() from Qt already = widest_item_text + overhead; extract overhead correctly
+        overhead = base.width() - max_w
         base.setWidth(overhead + max_w)
         return base
 
@@ -721,10 +731,12 @@ class TrackStrip(QFrame):
 class TrackBtn(QPushButton):
     state_changed = pyqtSignal(int)
 
-    def __init__(self, label: str, track: int, initial_state: int = 0, parent=None):
+    def __init__(self, label: str, track: int, initial_state: int = 0, color: str | None = None, min_state: int = 0, parent=None):
         super().__init__(label, parent)
         self._track = track
         self._state = initial_state
+        self._color = QColor(color) if color is not None else None
+        self._min_state = min_state
         self.setFlat(True)
         f = QFont()
         f.setPointSize(20)
@@ -742,8 +754,12 @@ class TrackBtn(QPushButton):
             self.update()
             self.state_changed.emit(state)
 
+    def set_min_state(self, min_state: int) -> None:
+        self._min_state = min_state
+
     def _cycle(self) -> None:
-        self.set_state((self._state + 1) % 3)
+        n = (self._state + 1) % 3
+        self.set_state(max(n, self._min_state))
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -751,7 +767,7 @@ class TrackBtn(QPushButton):
         if not self.isEnabled():
             p.setOpacity(0.3)
         rect = self.rect().adjusted(0, 0, -1, -1)
-        color = QColor(TRACK_COLORS[self._track])
+        color = self._color if self._color is not None else QColor(TRACK_COLORS[self._track])
         if self._state == 0:
             bg, fg = QColor(_BLACK), color
         else:
@@ -814,6 +830,12 @@ class LfoPanel(QFrame):
             if t < 4:
                 hdr.addSpacing(_LABEL_GAP)
 
+        hdr.addSpacing(_LABEL_GAP * 2)
+        self._master_btn = TrackBtn("M", 0, initial_state=0, color=_ACCENT, min_state=0)
+        self._master_btn.setFixedSize(36, 36)
+        self._master_btn.setEnabled(False)  # enabled only for master params (e.g. tempo)
+        hdr.addWidget(self._master_btn)
+
         hdr.addStretch(1)
         self._param_combo = self._make_combo(list(PARAMETER_LABELS))
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
@@ -874,7 +896,7 @@ class LfoPanel(QFrame):
         self._center_spin.setDecimals(1)
         self._center_spin.setSingleStep(1.0)
         self._center_spin.setRange(0.0, 99.0)
-        self._center_spin.setValue(50.0)  # ≈ MIDI 64 (center)
+        self._center_spin.setValue(90.0)  # ≈ MIDI 64 (center)
         self._center_spin.setFixedWidth(78)
         self._center_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._center_spin.setStyleSheet(_double_spin_style)
@@ -956,6 +978,7 @@ class LfoPanel(QFrame):
         self._center_spin.valueChanged.connect(self._update_preview)
         for btn in self._track_btns.values():
             btn.state_changed.connect(self._update_preview)
+        self._master_btn.state_changed.connect(self._on_master_btn_changed)
         self._lfo_list.itemSelectionChanged.connect(self._update_preview)
 
         _orig_focus_in  = self._lfo_list.focusInEvent
@@ -994,12 +1017,14 @@ class LfoPanel(QFrame):
     def _make_combo(self, items: list[str]) -> CycleCombo:
         box = CycleCombo()
         box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         box.addItems(items)
         box.setStyleSheet(
             f"QComboBox {{ font-size: 15pt; color: {_TEXT}; background-color: {_BG};"
             f"  border: 1px solid {_DIM}; border-radius: 4px; padding: 2px 4px; }}"
             f"QComboBox QAbstractItemView {{ color: {_TEXT}; background-color: {_BG};"
             f"  selection-background-color: {_ACCENT}; selection-color: #000; }}"
+            f"QComboBox QAbstractItemView::item {{ padding: 4px 8px; }}"
         )
         return box
 
@@ -1010,14 +1035,33 @@ class LfoPanel(QFrame):
 
     def _on_param_changed(self, text: str) -> None:
         param = PARAMETER_LABELS.get(text)
-        is_tempo = param is Parameter.TEMPO
+        is_master_only = param in _MASTER_ONLY_PARAMS   # M required (Tempo)
+        is_m_capable   = param in _MASTER_PARAMS        # M available (Tempo + FX/LFO)
 
-        for btn in self._track_btns.values():
-            btn.setEnabled(not is_tempo)
+        self._master_btn.setEnabled(is_m_capable)
+
+        if is_master_only:
+            self._master_btn.set_min_state(1)
+            if self._master_btn.state == 0:
+                self._master_btn.set_state(1)
+            for btn in self._track_btns.values():
+                btn.setEnabled(False)
+        elif is_m_capable:
+            # FX/LFO: preserve M state and track states — just re-sync enabled flags
+            self._master_btn.set_min_state(0)
+            for btn in self._track_btns.values():
+                btn.setEnabled(self._master_btn.state == 0)
+        else:
+            # Non-master (volume/pan/mute): M can't apply here, reset it
+            self._master_btn.set_min_state(0)
+            if self._master_btn.state != 0:
+                self._master_btn.set_state(0)
+            for btn in self._track_btns.values():
+                btn.setEnabled(True)
 
         self._depth_spin.blockSignals(True)
         self._center_spin.blockSignals(True)
-        if is_tempo:
+        if param is Parameter.TEMPO:
             self._depth_spin.setRange(0.0, 140.0)
             self._center_spin.setRange(20.0, 300.0)
             current_bpm = self._get_bpm() if self._get_bpm else 100.0
@@ -1030,6 +1074,13 @@ class LfoPanel(QFrame):
             self._depth_spin.setValue(25.0)
         self._depth_spin.blockSignals(False)
         self._center_spin.blockSignals(False)
+        self._update_preview()
+
+    def _on_master_btn_changed(self, state: int) -> None:
+        param = PARAMETER_LABELS[self._param_combo.currentText()]
+        if param in _MASTER_PARAMS and param not in _MASTER_ONLY_PARAMS:
+            for btn in self._track_btns.values():
+                btn.setEnabled(state == 0)
         self._update_preview()
 
     def _preview_lfos(self, lfos: list) -> None:
@@ -1048,9 +1099,13 @@ class LfoPanel(QFrame):
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
         param      = PARAMETER_LABELS[self._param_combo.currentText()]
 
-        if param is Parameter.TEMPO:
-            normal_colors   = [_ACCENT]
-            inverted_colors = []
+        if param in _MASTER_PARAMS and self._master_btn.state != 0:
+            if self._master_btn.state == 2:
+                normal_colors   = []
+                inverted_colors = [_ACCENT]
+            else:
+                normal_colors   = [_ACCENT]
+                inverted_colors = []
         else:
             normal_tracks   = [t for t, btn in self._track_btns.items() if btn.state == 1]
             inverted_tracks = [t for t, btn in self._track_btns.items() if btn.state == 2]
@@ -1089,6 +1144,8 @@ class LfoPanel(QFrame):
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
 
         if param is Parameter.TEMPO:
+            if self._master_btn.state == 0:
+                return
             if self._bpm_original is None and self._get_bpm:
                 self._bpm_original = self._get_bpm()
             # Replace any existing Tempo LFO (only one makes sense globally)
@@ -1102,7 +1159,25 @@ class LfoPanel(QFrame):
                 rate_ticks   = rate_ticks,
                 depth        = self._depth_spin.value(),
                 center_value = self._center_spin.value(),
-                inverted     = False,
+                inverted     = self._master_btn.state == 2,
+            )
+            self._engine.add_lfo(lfo)
+            self._active_lfos.append(lfo)
+            self._refresh_list()
+            return
+
+        # FX/LFO with M active → master routing (track 0)
+        if param in _MASTER_PARAMS and self._master_btn.state != 0:
+            depth        = _ui_to_midi(self._depth_spin.value())
+            center_value = _ui_to_midi(self._center_spin.value())
+            lfo = LfoClip(
+                track        = 0,
+                parameter    = param,
+                wave         = wave,
+                rate_ticks   = rate_ticks,
+                depth        = depth,
+                center_value = center_value,
+                inverted     = self._master_btn.state == 2,
             )
             self._engine.add_lfo(lfo)
             self._active_lfos.append(lfo)
@@ -1176,8 +1251,9 @@ class LfoPanel(QFrame):
                 lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
                 hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
                 inv_str = " [inv]" if lfo.inverted else ""
+                track_str = "M" if lfo.track == 0 else f"T{lfo.track}"
                 self._lfo_list.addItem(QListWidgetItem(
-                    f"T{lfo.track}  {lfo.parameter.value.upper()[:3]}  "
+                    f"{track_str}  {lfo.parameter.value.upper()[:3]}  "
                     f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}"
                 ))
 

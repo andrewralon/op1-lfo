@@ -16,8 +16,10 @@ CC_VOLUME    = 7
 CC_MUTE      = 9
 CC_PAN       = 10
 CC_OCTAVE    = 79
-CC_FX_BASE   = 54   # CC 54-57: Patch FX params 1-4
-CC_LFO_BASE  = 58   # CC 58-61: Patch LFO params 1-4
+CC_FX_BASE          = 54   # CC 54-57: Patch FX params 1-4
+CC_LFO_BASE         = 58   # CC 58-61: Patch LFO params 1-4
+CC_MASTER_FX_BASE   = 70   # CC 70-73: Master FX params 1-4
+CC_MASTER_COMP_BASE = 74   # CC 74-77: Master compressor params 1-4
 
 PAN_CENTER = 64
 MUTE_ON = 127
@@ -64,6 +66,16 @@ class Controller:
         self._validate_track(track)
         self._validate_value(value, f"lfo {param}")
         self._send_cc(track, CC_LFO_BASE + param - 1, value)
+
+    def set_master_fx(self, param: int, value: int) -> None:
+        """Set master FX parameter. param 1-4, value 0-127. Sends on channel 1."""
+        self._validate_value(value, f"master fx {param}")
+        self._safe_send(mido.Message("control_change", channel=0, control=CC_MASTER_FX_BASE + param - 1, value=value))
+
+    def set_master_compressor(self, param: int, value: int) -> None:
+        """Set master compressor parameter. param 1-4, value 0-127. Sends on channel 1."""
+        self._validate_value(value, f"master compressor {param}")
+        self._safe_send(mido.Message("control_change", channel=0, control=CC_MASTER_COMP_BASE + param - 1, value=value))
 
     def mute(self, track: int) -> None:
         """Mute a track. Idempotent — safe to call if already muted."""
