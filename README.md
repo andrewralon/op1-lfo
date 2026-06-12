@@ -121,9 +121,6 @@ This means when the primary track's value rises, the secondary tracks' values fa
 
 The active LFO list marks inverted clips with `[inv]` so you can tell them apart at a glance.
 
-![inverted lfo 1](images/ss-inverted-lfo-1.png)
-![inverted lfo 2](images/ss-inverted-lfo-2.png)
-
 #### Buttons
 
 | Button | Action |
