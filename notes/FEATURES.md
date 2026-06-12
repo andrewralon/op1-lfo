@@ -1,7 +1,8 @@
 # Features
 
 ## To do
-- [ ] One-shot LFOs: add a `loop` flag to `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI needs a "start once" or "1-shot" trigger or a 1x toggle alongside Start. Sweep curves should default to one-shot. The active LFOs list would show them disappearing automatically on completion.
+- [ ] Narrow layout: reduce overall app width by ~25% (e.g. 400px → 300px). Shrink: track column widths (mute button, pan knob, volume fader), waveform preview, Start/Stop buttons, active LFOs list, and all horizontal padding between elements.
+- [ ] One-shot LFOs: add a `loop` flag to `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI: add a **×1** button directly below the Start button, same style as Start. Sweep curves should default to one-shot (×1 pre-selected when Sweep Up or Sweep Down is chosen). In the active LFOs list, looping clips show no marker; one-shot clips show `[×1]` next to the name and disappear automatically when the cycle completes.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 
