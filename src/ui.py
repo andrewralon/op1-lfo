@@ -801,6 +801,7 @@ class LfoPanel(QFrame):
         self._set_bpm      = set_bpm_fn
         self._active_lfos: list[LfoClip] = []
         self._bpm_original: float | None = None
+        self._master_auto = False  # True when M was activated by param change, not user click
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -1043,19 +1044,22 @@ class LfoPanel(QFrame):
         if is_master_only:
             self._master_btn.set_min_state(1)
             if self._master_btn.state == 0:
-                self._master_btn.set_state(1)
+                self._master_btn.set_state(1)  # signal fires first, then we set flag
+                self._master_auto = True
             for btn in self._track_btns.values():
                 btn.setEnabled(False)
         elif is_m_capable:
-            # FX/LFO: preserve M state and track states — just re-sync enabled flags
             self._master_btn.set_min_state(0)
+            if self._master_auto:
+                self._master_btn.set_state(0)
+                self._master_auto = False
             for btn in self._track_btns.values():
                 btn.setEnabled(self._master_btn.state == 0)
         else:
-            # Non-master (volume/pan/mute): M can't apply here, reset it
             self._master_btn.set_min_state(0)
             if self._master_btn.state != 0:
                 self._master_btn.set_state(0)
+            self._master_auto = False
             for btn in self._track_btns.values():
                 btn.setEnabled(True)
 
@@ -1077,6 +1081,7 @@ class LfoPanel(QFrame):
         self._update_preview()
 
     def _on_master_btn_changed(self, state: int) -> None:
+        self._master_auto = False  # user explicitly changed M
         param = PARAMETER_LABELS[self._param_combo.currentText()]
         if param in _MASTER_PARAMS and param not in _MASTER_ONLY_PARAMS:
             for btn in self._track_btns.values():
@@ -1256,6 +1261,15 @@ class LfoPanel(QFrame):
                     f"{track_str}  {lfo.parameter.value.upper()[:3]}  "
                     f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}"
                 ))
+
+    def set_tempo_available(self, available: bool) -> None:
+        idx = self._param_combo.findText("tempo")
+        if available and idx == -1:
+            self._param_combo.insertItem(3, "tempo")  # restore after volume/pan/mute
+        elif not available and idx != -1:
+            if self._param_combo.currentText() == "tempo":
+                self._param_combo.setCurrentIndex(0)  # fall back to volume
+            self._param_combo.removeItem(self._param_combo.findText("tempo"))
 
     def on_beat(self, beat_count: int) -> None:
         rate_ticks  = _RATE_TICKS[self._rate_spin.value()]
@@ -1536,6 +1550,13 @@ class MainWindow(QMainWindow):
             )
             self._bpm_up_btn.setEnabled(True)
             self._bpm_down_btn.setEnabled(True)
+
+        self._lfo_panel.set_tempo_available(self._tempo_lfo_available())
+
+    def _tempo_lfo_available(self) -> bool:
+        if self._conn_in_port_name == self._NO_DEVICE:
+            return True  # no-device mode: allow experimenting
+        return not self._ble and self._tempo_mode == TempoMode.APP_CLOCK
 
     def _toggle_mode(self) -> None:
         self._startup_detection_done = True  # manual override locks in the choice
