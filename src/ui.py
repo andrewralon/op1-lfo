@@ -869,20 +869,14 @@ class LfoPanel(QFrame):
             f"QSpinBox {{ color: {_TEXT}; background-color: {_BG};"
             f"  border: 1px solid {_DIM}; border-radius: 4px;"
             f"  font-size: 15pt; padding: 2px 4px; }}"
-            f"QSpinBox::up-button {{ subcontrol-origin: border; subcontrol-position: top right;"
-            f"  width: 16px; background-color: {_BG}; border-left: 1px solid {_DIM};"
-            f"  border-bottom: 1px solid {_DIM}; }}"
-            f"QSpinBox::down-button {{ subcontrol-origin: border; subcontrol-position: bottom right;"
-            f"  width: 16px; background-color: {_BG}; border-left: 1px solid {_DIM}; }}"
-            f"QSpinBox::up-arrow {{ image: url({_ARROW_UP_SVG}); width: 8px; height: 5px; }}"
-            f"QSpinBox::down-arrow {{ image: url({_ARROW_DOWN_SVG}); width: 8px; height: 5px; }}"
         )
         _double_spin_style = _spin_style.replace("QSpinBox", "QDoubleSpinBox")
 
         self._rate_spin = QSpinBox()
         self._rate_spin.setRange(1, 8)
         self._rate_spin.setValue(3)   # default: 4 beats/cycle
-        self._rate_spin.setFixedWidth(48)
+        self._rate_spin.setFixedWidth(36)
+        self._rate_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self._rate_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._rate_spin.setStyleSheet(_spin_style)
 
@@ -893,7 +887,8 @@ class LfoPanel(QFrame):
         self._depth_spin.setSingleStep(1.0)
         self._depth_spin.setRange(0.0, 49.0)
         self._depth_spin.setValue(25.0)
-        self._depth_spin.setFixedWidth(66)
+        self._depth_spin.setFixedWidth(52)
+        self._depth_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self._depth_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._depth_spin.setStyleSheet(_double_spin_style)
 
@@ -902,14 +897,15 @@ class LfoPanel(QFrame):
         self._center_spin.setSingleStep(1.0)
         self._center_spin.setRange(0.0, 99.0)
         self._center_spin.setValue(90.0)  # ≈ MIDI 64 (center)
-        self._center_spin.setFixedWidth(66)
+        self._center_spin.setFixedWidth(52)
+        self._center_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self._center_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._center_spin.setStyleSheet(_double_spin_style)
 
         snap_btn = QPushButton("⊙")
         snap_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 12pt;"
+            f"  border: none; border-radius: 4px; font-size: 18pt;"
             f"  padding: 4px 10px; }}"
             f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
         )
