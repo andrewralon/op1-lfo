@@ -834,7 +834,7 @@ class LfoPanel(QFrame):
                 hdr.addSpacing(_LABEL_GAP)
 
         hdr.addSpacing(_LABEL_GAP * 2)
-        self._master_btn = TrackBtn("M", 0, initial_state=0, color=_ACCENT, min_state=0)
+        self._master_btn = TrackBtn("m", 0, initial_state=0, color=_ACCENT, min_state=0)
         self._master_btn.setFixedSize(36, 36)
         self._master_btn.setEnabled(False)  # enabled only for master params (e.g. tempo)
         hdr.addWidget(self._master_btn)
@@ -1287,7 +1287,7 @@ class LfoPanel(QFrame):
                 lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
                 hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
                 inv_str = " [inv]" if lfo.inverted else ""
-                track_str = "M" if lfo.track == 0 else f"T{lfo.track}"
+                track_str = "m" if lfo.track == 0 else f"t{lfo.track}"
                 self._lfo_list.addItem(QListWidgetItem(
                     f"{track_str}  {lfo.parameter.value.upper()[:3]}  "
                     f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}{loop_str}"
