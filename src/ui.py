@@ -817,10 +817,9 @@ class LfoPanel(QFrame):
         root.setSpacing(16)
         root.setContentsMargins(10, 10, 10, 10)
 
-        # ── Row 1: title + Track buttons / Param / Wave ──
+        # ── Row 1: Track buttons ──
         hdr = QHBoxLayout()
         hdr.setSpacing(0)
-
         hdr.addStretch(1)
 
         # Track toggle buttons — create before wiring signals to avoid premature callbacks
@@ -838,24 +837,27 @@ class LfoPanel(QFrame):
         self._master_btn.setFixedSize(30, 30)
         self._master_btn.setEnabled(False)  # enabled only for master params (e.g. tempo)
         hdr.addWidget(self._master_btn)
-
         hdr.addStretch(1)
+        root.addLayout(hdr)
+
+        # ── Row 2: Param / Wave ──
         self._param_combo = self._make_combo(list(PARAMETER_LABELS))
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
 
-        hdr.addWidget(self._dim_label("☂", _ICON_PT))
-        hdr.addSpacing(_LABEL_GAP)
-        hdr.addWidget(self._param_combo)
+        pw_row = QHBoxLayout()
+        pw_row.setSpacing(0)
+        pw_row.addStretch(1)
+        pw_row.addWidget(self._dim_label("☂", _ICON_PT))
+        pw_row.addSpacing(_LABEL_GAP)
+        pw_row.addWidget(self._param_combo)
+        pw_row.addStretch(1)
+        pw_row.addWidget(SvgIcon(_WAVE_SVG, 22))
+        pw_row.addSpacing(_LABEL_GAP)
+        pw_row.addWidget(self._wave_combo)
+        pw_row.addStretch(1)
+        root.addLayout(pw_row)
 
-        hdr.addStretch(1)
-        hdr.addWidget(SvgIcon(_WAVE_SVG, 22))
-        hdr.addSpacing(_LABEL_GAP)
-        hdr.addWidget(self._wave_combo)
-        hdr.addStretch(1)
-
-        root.addLayout(hdr)
-
-        # ── Row 2: waveform preview ──
+        # ── Row 3: waveform preview ──
         self._preview = WaveformPreview()
         root.addWidget(self._preview)
 
@@ -1363,7 +1365,8 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, in_port_name: str, out_port_name: str, clock_gen) -> None:
         self.setWindowTitle("op1 lfo hero")
-        self.setMinimumSize(535, 600)
+        self.setFixedWidth(338)
+        self.setMinimumHeight(600)
         self.setStyleSheet(f"QMainWindow {{ background-color: {_BG}; }}")
 
         central = QWidget()
@@ -1372,7 +1375,7 @@ class MainWindow(QMainWindow):
         root.setSpacing(12)
         root.setContentsMargins(10, 14, 10, 14)
 
-        # ── Transport + octave buttons (left of tracks) ──
+        # ── Transport + octave buttons ──
         _btn_ss = (
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
             f"  border: none; border-radius: 6px; font-size: 18pt; }}"
@@ -1386,9 +1389,9 @@ class MainWindow(QMainWindow):
             b.setStyleSheet(_btn_ss)
             return b
 
-        play_btn     = _make_btn("▶")
-        stop_btn     = _make_btn("■")
-        oct_left_btn = _make_btn("←")
+        play_btn      = _make_btn("▶")
+        stop_btn      = _make_btn("■")
+        oct_left_btn  = _make_btn("←")
         oct_right_btn = _make_btn("→")
 
         play_btn.clicked.connect(self._on_transport_play)
@@ -1396,45 +1399,25 @@ class MainWindow(QMainWindow):
         oct_left_btn.clicked.connect(clock_gen.tape_prev_bar)
         oct_right_btn.clicked.connect(clock_gen.tape_next_bar)
 
-        transport_row = QHBoxLayout()
-        transport_row.setSpacing(8)
-        transport_row.addWidget(play_btn)
-        transport_row.addWidget(stop_btn)
-
-        octave_row = QHBoxLayout()
-        octave_row.setSpacing(8)
-        octave_row.addWidget(oct_left_btn)
-        octave_row.addWidget(oct_right_btn)
-
-        btn_widget = QWidget()
-        btn_widget.setFixedWidth(88)
-        btn_col = QVBoxLayout(btn_widget)
-        btn_col.setSpacing(10)
-        btn_col.setContentsMargins(0, 0, 0, 0)
-        btn_col.addStretch()
-        btn_col.addLayout(transport_row)
-        btn_col.addLayout(octave_row)
-        btn_col.addStretch()
-
-        # ── Track strips, centered as a group with button column ──
+        # ── Track strips ──
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(6)
         tracks_row.addStretch()
-        tracks_row.addWidget(btn_widget)
         for t in (1, 2, 3, 4):
             strip = TrackStrip(t, controller)
             self._strips[t] = strip
             tracks_row.addWidget(strip)
+        tracks_row.addStretch()
 
-        bpm_widget = QWidget()
-        bpm_widget.setFixedWidth(96)
-        bpm_layout = QVBoxLayout(bpm_widget)
-        bpm_layout.setSpacing(1)
-        bpm_layout.setContentsMargins(2, 0, 2, 0)
-        bpm_layout.addStretch()
+        tracks_widget = QWidget()
+        tracks_widget.setMaximumHeight(220)
+        _tw_layout = QVBoxLayout(tracks_widget)
+        _tw_layout.setContentsMargins(0, 0, 0, 0)
+        _tw_layout.addLayout(tracks_row)
+        root.addWidget(tracks_widget)
 
-        bpm_title = SvgIcon(_METRONOME_SVG, 36)
-        bpm_layout.addWidget(bpm_title, alignment=Qt.AlignmentFlag.AlignCenter)
+        # ── BPM ──
+        bpm_title = SvgIcon(_METRONOME_SVG, 30)
 
         self._bpm_spin = QDoubleSpinBox()
         self._bpm_spin.setRange(20.0, 300.0)
@@ -1470,30 +1453,28 @@ class MainWindow(QMainWindow):
         bpm_btn_col = QVBoxLayout()
         bpm_btn_col.setSpacing(2)
         bpm_btn_col.setContentsMargins(0, 0, 0, 0)
-        bpm_btn_col.addStretch()
         bpm_btn_col.addWidget(self._bpm_up_btn)
         bpm_btn_col.addWidget(self._bpm_down_btn)
-        bpm_btn_col.addStretch()
 
-        bpm_spin_row = QHBoxLayout()
-        bpm_spin_row.setSpacing(4)
-        bpm_spin_row.setContentsMargins(0, 0, 0, 0)
-        bpm_spin_row.addStretch(5)
-        bpm_spin_row.addWidget(self._bpm_spin, alignment=Qt.AlignmentFlag.AlignVCenter)
-        bpm_spin_row.addLayout(bpm_btn_col)
-        bpm_spin_row.addSpacing(2)
-        bpm_layout.addLayout(bpm_spin_row)
-
-        bpm_layout.addStretch()
-        tracks_row.addWidget(bpm_widget)
-        tracks_row.addStretch()
-
-        tracks_widget = QWidget()
-        tracks_widget.setMaximumHeight(220)
-        _tw_layout = QVBoxLayout(tracks_widget)
-        _tw_layout.setContentsMargins(0, 0, 0, 0)
-        _tw_layout.addLayout(tracks_row)
-        root.addWidget(tracks_widget)
+        # ── Controls row: transport + BPM ──
+        controls_row = QHBoxLayout()
+        controls_row.setSpacing(0)
+        controls_row.addStretch(1)
+        controls_row.addWidget(play_btn)
+        controls_row.addSpacing(4)
+        controls_row.addWidget(stop_btn)
+        controls_row.addSpacing(12)
+        controls_row.addWidget(oct_left_btn)
+        controls_row.addSpacing(4)
+        controls_row.addWidget(oct_right_btn)
+        controls_row.addStretch(2)
+        controls_row.addWidget(bpm_title, alignment=Qt.AlignmentFlag.AlignVCenter)
+        controls_row.addSpacing(8)
+        controls_row.addWidget(self._bpm_spin, alignment=Qt.AlignmentFlag.AlignVCenter)
+        controls_row.addSpacing(4)
+        controls_row.addLayout(bpm_btn_col)
+        controls_row.addStretch(1)
+        root.addLayout(controls_row)
 
         # ── LFO panel ──
         self._lfo_panel = LfoPanel(
