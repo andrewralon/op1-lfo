@@ -83,7 +83,15 @@ def main() -> None:
         # Runs on the clock daemon thread — only emit signals here.
         bridge.automation_update.emit(track, param.value, float(value))
 
-    engine = AutomationEngine(controller, update_callback=on_automation_update)
+    def on_lfo_finished(lfo) -> None:
+        # Runs on the clock daemon thread — only emit signals here.
+        bridge.lfo_finished.emit(lfo)
+
+    engine = AutomationEngine(
+        controller,
+        update_callback=on_automation_update,
+        lfo_finished_callback=on_lfo_finished,
+    )
 
     def on_beat(beat_num: int) -> None:
         bridge.beat.emit(beat_num)

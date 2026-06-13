@@ -177,7 +177,7 @@ def lfo_wave_value(phase: float, wave: LfoWave) -> float:
 
 @dataclass
 class LfoClip:
-    """Continuously oscillating automation — always loops."""
+    """Continuously oscillating automation."""
     track: int          # 1-4
     parameter: Parameter
     wave: LfoWave
@@ -185,6 +185,7 @@ class LfoClip:
     depth: int | float          # oscillation half-amplitude (MIDI units or BPM for Tempo)
     center_value: int | float   # MIDI center (0-127) or BPM for Tempo
     inverted: bool = False
+    loop: bool = True           # False = one-shot: auto-removed after one full cycle
     _random_prev_phase: float = field(default=-1.0, init=False, repr=False)
     _random_value: float = field(default=0.0, init=False, repr=False)
 
@@ -221,9 +222,11 @@ class AutomationEngine:
         self,
         controller: Controller,
         update_callback: AutomationUpdateCallback | None = None,
+        lfo_finished_callback: Callable[[LfoClip], None] | None = None,
     ) -> None:
         self._ctrl = controller
         self._update_cb = update_callback
+        self._lfo_finished_cb = lfo_finished_callback
         self._lock = threading.Lock()
         self._clips: list[Clip] = []
 
@@ -234,6 +237,8 @@ class AutomationEngine:
 
         self._lfos: list[LfoClip] = []
         self._lfo_last_sent: dict[int, int] = {}
+        # id(lfo) → tick_count at which that lfo's first tick was processed
+        self._lfo_start_ticks: dict[int, int] = {}
 
     # ------------------------------------------------------------------
     # Clip management — call from any thread
@@ -276,6 +281,7 @@ class AutomationEngine:
         with self._lock:
             self._lfos = [l for l in self._lfos if l is not lfo]
             self._lfo_last_sent.pop(id(lfo), None)
+            self._lfo_start_ticks.pop(id(lfo), None)
 
     def remove_lfos_by_track(self, track: int) -> None:
         with self._lock:
@@ -283,11 +289,13 @@ class AutomationEngine:
             self._lfos = [l for l in self._lfos if l.track != track]
             for l in gone:
                 self._lfo_last_sent.pop(id(l), None)
+                self._lfo_start_ticks.pop(id(l), None)
 
     def clear_lfos(self) -> None:
         with self._lock:
             self._lfos.clear()
             self._lfo_last_sent.clear()
+            self._lfo_start_ticks.clear()
 
     @property
     def lfos(self) -> list[LfoClip]:
@@ -309,8 +317,21 @@ class AutomationEngine:
             if done:
                 finished.append(clip)
 
+        finished_lfos: list[LfoClip] = []
         for lfo in lfos:
-            self._evaluate_lfo(lfo, tick_count)
+            done = self._evaluate_lfo(lfo, tick_count)
+            if done:
+                finished_lfos.append(lfo)
+
+        if finished_lfos:
+            with self._lock:
+                for lfo in finished_lfos:
+                    self._lfos = [l for l in self._lfos if l is not lfo]
+                    self._lfo_last_sent.pop(id(lfo), None)
+                    self._lfo_start_ticks.pop(id(lfo), None)
+            if self._lfo_finished_cb:
+                for lfo in finished_lfos:
+                    self._lfo_finished_cb(lfo)
 
         if finished:
             with self._lock:
@@ -378,11 +399,27 @@ class AutomationEngine:
         if self._update_cb:
             self._update_cb(clip.track, clip.parameter, value)
 
-    def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> None:
+    def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> bool:
+        """Evaluate one LFO tick. Returns True if the LFO is finished (one-shot complete)."""
         rate = lfo.rate_ticks * LFO_RATE_MULTIPLIERS.get(lfo.wave, 1)
-        phase = (tick_count % rate) / rate
+
+        if not lfo.loop:
+            lfo_id = id(lfo)
+            with self._lock:
+                if lfo_id not in self._lfo_start_ticks:
+                    self._lfo_start_ticks[lfo_id] = tick_count
+                start = self._lfo_start_ticks[lfo_id]
+            elapsed = tick_count - start
+            duration = 8 * PPQN  # matches the 8-beat preview window
+            if elapsed >= duration:
+                return True
+            phase = (elapsed % rate) / rate
+        else:
+            phase = (tick_count % (8 * PPQN)) / rate
+
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
+        return False
 
     def _send_lfo_if_changed(self, lfo: LfoClip, value: int | float) -> None:
         lfo_id = id(lfo)

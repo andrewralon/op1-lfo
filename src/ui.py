@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QPointF, QRectF, QSize, QTimer
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPolygonF
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPolygonF, QIcon
 from PyQt6.QtSvg import QSvgRenderer
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
@@ -72,9 +72,10 @@ _METRONOME_SVG  = _ASSETS + "metronome.svg"
 _DEPTH_SVG      = _ASSETS + "depth.svg"
 _CENTER_SVG     = _ASSETS + "center.svg"
 _WAVE_SVG       = _ASSETS + "wave.svg"
+_LOOP_SVG       = _ASSETS + "loop.svg"
 
 # OTHER - UI CONSTRAINTS
-_LABEL_GAP  = 12  # px between a label and its paired control (dropdown, spinbox, etc.)
+_LABEL_GAP  = 8  # px between a label and its paired control (dropdown, spinbox, etc.)
 _ICON_PT    = 26  # pt size for unicode icon labels
 
 
@@ -193,6 +194,7 @@ class ClockBridge(QObject):
     cc_received       = pyqtSignal(int, int, int)
     disconnected      = pyqtSignal()
     reconnected       = pyqtSignal()
+    lfo_finished      = pyqtSignal(object)
 
 
 # ---------------------------------------------------------------------------
@@ -937,25 +939,35 @@ class LfoPanel(QFrame):
         btn_col.setSpacing(6)
         btn_col.setContentsMargins(0, 0, 0, 0)
 
-        start_btn = QPushButton("▶  Start")
-        start_btn.setFixedHeight(28)
-        start_btn.setStyleSheet(
+        loop_btn = QPushButton("∞")
+        loop_btn.setFixedHeight(28)
+        loop_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
+            f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 14px; }}"
             f"QPushButton:hover {{ background-color: #2a6a2a; }}"
         )
-        start_btn.clicked.connect(self._on_start)
+        loop_btn.clicked.connect(self._on_start)
 
-        clear_btn = QPushButton("✕  Clear")
+        oneshot_btn = QPushButton("1×")
+        oneshot_btn.setFixedHeight(28)
+        oneshot_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
+            f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 14px; }}"
+            f"QPushButton:hover {{ background-color: #2a6a2a; }}"
+        )
+        oneshot_btn.clicked.connect(self._on_start_oneshot)
+
+        clear_btn = QPushButton("⌫")
         clear_btn.setFixedHeight(28)
         clear_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
+            f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 14px; }}"
             f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
         )
         clear_btn.clicked.connect(self._on_stop_all)
 
-        btn_col.addWidget(start_btn)
+        btn_col.addWidget(loop_btn)
+        btn_col.addWidget(oneshot_btn)
         btn_col.addWidget(clear_btn)
 
         self._lfo_list = QListWidget()
@@ -1144,6 +1156,12 @@ class LfoPanel(QFrame):
         self._center_spin.setValue(_midi_to_ui(midi_val))
 
     def _on_start(self) -> None:
+        self._start(loop=True)
+
+    def _on_start_oneshot(self) -> None:
+        self._start(loop=False)
+
+    def _start(self, loop: bool) -> None:
         param      = PARAMETER_LABELS[self._param_combo.currentText()]
         wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
@@ -1165,6 +1183,7 @@ class LfoPanel(QFrame):
                 depth        = self._depth_spin.value(),
                 center_value = self._center_spin.value(),
                 inverted     = self._master_btn.state == 2,
+                loop         = loop,
             )
             self._engine.add_lfo(lfo)
             self._active_lfos.append(lfo)
@@ -1183,6 +1202,7 @@ class LfoPanel(QFrame):
                 depth        = depth,
                 center_value = center_value,
                 inverted     = self._master_btn.state == 2,
+                loop         = loop,
             )
             self._engine.add_lfo(lfo)
             self._active_lfos.append(lfo)
@@ -1203,10 +1223,20 @@ class LfoPanel(QFrame):
                 depth        = depth,
                 center_value = center_value,
                 inverted     = btn.state == 2,
+                loop         = loop,
             )
             self._engine.add_lfo(lfo)
             self._active_lfos.append(lfo)
         self._refresh_list()
+
+    def _on_lfo_finished(self, lfo: object) -> None:
+        """Called on the Qt main thread when a one-shot LFO completes."""
+        try:
+            self._active_lfos.remove(lfo)
+        except ValueError:
+            pass
+        self._refresh_list()
+        self._maybe_restore_bpm()
 
     def _lfo_list_key_press(self, event) -> None:
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
@@ -1246,11 +1276,12 @@ class LfoPanel(QFrame):
                 rate_str = f"{lfo.rate_ticks // PPQN}b/cycle"
             else:
                 rate_str = f"{PPQN // lfo.rate_ticks}x/beat"
+            loop_str = "" if lfo.loop else " [1×]"
             if lfo.parameter is Parameter.TEMPO:
                 lo = max(20,  lfo.center_value - lfo.depth)
                 hi = min(300, lfo.center_value + lfo.depth)
                 self._lfo_list.addItem(QListWidgetItem(
-                    f"tempo  {lfo.wave.value}  {lo:.1f}↔{hi:.1f}bpm  {rate_str}"
+                    f"tempo  {lfo.wave.value}  {lo:.1f}↔{hi:.1f}bpm  {rate_str}{loop_str}"
                 ))
             else:
                 lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
@@ -1259,7 +1290,7 @@ class LfoPanel(QFrame):
                 track_str = "M" if lfo.track == 0 else f"T{lfo.track}"
                 self._lfo_list.addItem(QListWidgetItem(
                     f"{track_str}  {lfo.parameter.value.upper()[:3]}  "
-                    f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}"
+                    f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}{loop_str}"
                 ))
 
     def set_tempo_available(self, available: bool) -> None:
@@ -1309,6 +1340,7 @@ class MainWindow(QMainWindow):
         bridge.cc_received.connect(self._on_cc_received)
         bridge.disconnected.connect(self._on_disconnected)
         bridge.reconnected.connect(self._on_reconnected)
+        bridge.lfo_finished.connect(self._lfo_panel._on_lfo_finished)
 
     _NO_DEVICE = "no device"
 

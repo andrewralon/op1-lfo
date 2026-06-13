@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 18">
+  <!-- Top arrow: (4,6) over the top to (24,8); arrowhead points DOWN at right -->
+  <path d="M 4,6 C 4,0 24,4 24,8"
+        fill="none" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round"/>
+  <polygon points="24,11 22,8 26,8" fill="#aaaaaa"/>
+  <!-- Bottom arrow: (24,13) under the bottom to (4,11); arrowhead points UP at left -->
+  <path d="M 24,13 C 24,16 4,14 4,11"
+        fill="none" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round"/>
+  <polygon points="4,8 2,11 6,11" fill="#aaaaaa"/>
+</svg>

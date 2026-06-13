@@ -1,8 +1,11 @@
 # Features
 
 ## To do
+- [ ] Generic MIDI device support: allow the app to connect to any MIDI device, not just OP-1s. Remove the OP-1 keyword filter from port detection; let the user pick a port from a list. Disable or hide OP-1-specific features (tape scrub, octave shift, BLE detection) when a non-OP-1 device is selected.
 - [ ] Narrow layout: reduce overall app width by ~25% (e.g. 400px → 300px). Shrink: track column widths (mute button, pan knob, volume fader), waveform preview, Start/Stop buttons, active LFOs list, and all horizontal padding between elements.
-- [ ] One-shot LFOs: add a `loop` flag to `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI: add a **×1** button directly below the Start button, same style as Start. In the active LFOs list, looping clips show no marker; one-shot clips show `[×1]` next to the name and disappear automatically when the cycle completes.
+- [ ] Desktop executables: package the app as a standalone binary for macOS and Windows using PyInstaller (or similar), so users can run it without a Python environment.
+- [ ] GitHub Actions release workflow: on GitHub release publish, automatically build the macOS and Windows executables and upload them as release artifacts. Triggered by the `release: published` event; one job per platform using hosted runners.
+- [ ] iOS port: refactor the UI layer to run on iOS (e.g. via Kivy, BeeWare/Toga, or a web-based frontend). Keep the existing PyQt6 desktop path intact so the app can still be launched from Python; the iOS target should share the core engine (`automation.py`, `clock.py`, `controller.py`) and add a separate UI entry point.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 
@@ -46,3 +49,4 @@
 - [x] Master LFO support: **M** button added to the LFO panel (green, same 3-state style as tracks). Selecting a master param (tempo) disables track 1-4 buttons and enables M; M auto-activates to "on" state. Second click inverts the curve, third click turns M off — identical behavior to per-track buttons. `_MASTER_PARAMS` frozenset makes adding future master params (master volume, compression) a one-line change.
 - [x] Master FX params: add OP-1 MIDI CC params for master FX controls (see OP-1 MIDI spec)
 - [x] Master volume + compression params: add OP-1 MIDI CC params for master volume and master compression (see OP-1 MIDI spec)
+- [x] One-shot LFOs: `loop` flag on `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI: **1×** button directly below Loop, same style. Active LFOs list: looping clips show no marker; one-shot clips show `[×1]` and disappear automatically when the cycle completes.
