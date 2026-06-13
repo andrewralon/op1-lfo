@@ -132,6 +132,18 @@ _RATE_TICKS: dict[int, int] = {
 class CycleCombo(QComboBox):
     """QComboBox whose Up/Down keys wrap, and whose width never changes with the selection."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._wheel_accum = 0
+
+    def wheelEvent(self, event):
+        self._wheel_accum += event.angleDelta().y()
+        if abs(self._wheel_accum) >= 120:
+            step = -1 if self._wheel_accum > 0 else 1
+            self.setCurrentIndex((self.currentIndex() + step) % self.count())
+            self._wheel_accum = 0
+        event.accept()
+
     def sizeHint(self):
         base = super().sizeHint()
         if self.count() == 0:
