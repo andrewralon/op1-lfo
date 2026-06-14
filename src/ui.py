@@ -168,6 +168,42 @@ class CycleCombo(QComboBox):
             super().keyPressEvent(event)
 
 
+class TransportGroup(QWidget):
+    """Row of buttons that stay square and expand together as the window widens."""
+    _GAPS = [4, 12, 4]
+    _MIN_SIDE = 38
+
+    def __init__(self, btns: list, parent=None):
+        super().__init__(parent)
+        self._btns = btns
+        self._total_gap = sum(self._GAPS)
+        row = QHBoxLayout(self)
+        row.setSpacing(0)
+        row.setContentsMargins(0, 0, 0, 0)
+        for i, btn in enumerate(btns):
+            row.addWidget(btn)
+            if i < len(self._GAPS):
+                row.addSpacing(self._GAPS[i])
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+    def _side(self, w: int) -> int:
+        return max(self._MIN_SIDE, (w - self._total_gap) // len(self._btns))
+
+    def hasHeightForWidth(self): return True
+    def heightForWidth(self, w): return self._side(w)
+    def sizeHint(self):
+        side = self._MIN_SIDE
+        return QSize(len(self._btns) * side + self._total_gap, side)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        side = self._side(self.width())
+        for btn in self._btns:
+            btn.setFixedSize(side, side)
+        if self.height() != side:
+            self.setFixedHeight(side)
+
+
 class SvgIcon(QWidget):
     """Renders an SVG file at a fixed logical size. Qt handles Retina scaling automatically."""
     def __init__(self, path: str, height: int, parent=None):
@@ -451,7 +487,7 @@ class WaveformPreview(QWidget):
         self._normal_colors: list[str]   = [_ACCENT]
         self._inverted_colors: list[str] = []
         self._lfos_override: list | None = None
-        self.setFixedHeight(65)
+        self.setMinimumHeight(50)
         self.setStyleSheet(
             f"background-color: {_BG};"
             f"border: 1px solid {_BORDER};"
@@ -568,7 +604,8 @@ class TrackStrip(QFrame):
             f"   border: 1px solid {_BORDER};"
             "}"
         )
-        self.setFixedWidth(75)
+        self.setMinimumWidth(60)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         outer = QVBoxLayout(self)
         outer.setSpacing(0)
@@ -936,7 +973,7 @@ class LfoPanel(QFrame):
         root.addLayout(params_row)
 
         # ── Row 4: waveform preview ──
-        root.addWidget(self._preview)
+        root.addWidget(self._preview, 1)
 
         # ── Rows 5+6: action buttons (left) + Active LFOs (right) ──
         bottom_row = QHBoxLayout()
@@ -990,7 +1027,7 @@ class LfoPanel(QFrame):
 
         bottom_row.addLayout(btn_col)
         bottom_row.addWidget(self._lfo_list, stretch=1)
-        root.addLayout(bottom_row)
+        root.addLayout(bottom_row, 1)
 
         # Wire up live preview and param changes
         self._param_combo.currentTextChanged.connect(self._on_param_changed)
@@ -1371,7 +1408,7 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, in_port_name: str, out_port_name: str, clock_gen) -> None:
         self.setWindowTitle("op1 lfo hero")
-        self.setFixedWidth(338)
+        self.setMinimumWidth(338)
         self.setMinimumHeight(600)
         self.setStyleSheet(f"QMainWindow {{ background-color: {_BG}; }}")
 
@@ -1408,19 +1445,16 @@ class MainWindow(QMainWindow):
         # ── Track strips ──
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(6)
-        tracks_row.addStretch()
         for t in (1, 2, 3, 4):
             strip = TrackStrip(t, controller)
             self._strips[t] = strip
             tracks_row.addWidget(strip)
-        tracks_row.addStretch()
 
         tracks_widget = QWidget()
-        tracks_widget.setMaximumHeight(220)
         _tw_layout = QVBoxLayout(tracks_widget)
         _tw_layout.setContentsMargins(0, 0, 0, 0)
         _tw_layout.addLayout(tracks_row)
-        root.addWidget(tracks_widget)
+        root.addWidget(tracks_widget, 1)
 
         # ── BPM ──
         bpm_title = SvgIcon(_METRONOME_SVG, 30)
@@ -1488,7 +1522,7 @@ class MainWindow(QMainWindow):
             get_bpm_fn=lambda: self._bpm_spin.value(),
             set_bpm_fn=self._set_bpm_from_lfo,
         )
-        root.addWidget(self._lfo_panel, 1)
+        root.addWidget(self._lfo_panel, 2)
 
         # ── Status bar ──
         status_row = QHBoxLayout()
